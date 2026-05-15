@@ -24,20 +24,31 @@ export default function CoordenadorDashboard({ user }) {
     try {
       setLoading(true)
 
-      const { data: analistasData } = await supabase
+      console.log('=== INICIANDO FETCH ===')
+
+      const { data: analistasData, error: analistasError } = await supabase
         .from('users')
         .select('*')
         .eq('role', 'analista')
         .order('nome')
 
-      const { data: companiesData } = await supabase
+      if (analistasError) throw analistasError
+      console.log('Analistas carregados:', analistasData)
+
+      const { data: companiesData, error: companiesError } = await supabase
         .from('empresas')
         .select('*')
         .order('nome')
 
-      const { data: userCompaniesData } = await supabase
+      if (companiesError) throw companiesError
+      console.log('Empresas carregadas:', companiesData?.length)
+
+      const { data: userCompaniesData, error: ucError } = await supabase
         .from('user_companies')
         .select('*')
+
+      if (ucError) throw ucError
+      console.log('User Companies carregadas:', userCompaniesData?.length, userCompaniesData)
 
       const { data: extratosData } = await supabase
         .from('extratos')
@@ -52,8 +63,10 @@ export default function CoordenadorDashboard({ user }) {
       setUserCompanies(userCompaniesData || [])
       setExtratos(extratosData || [])
       setChecklists(checklistsData || [])
+
+      console.log('=== DADOS SETADOS ===')
     } catch (error) {
-      console.error('Erro:', error)
+      console.error('Erro ao carregar dados:', error)
       alert('Erro ao carregar dados: ' + error.message)
     } finally {
       setLoading(false)
@@ -137,6 +150,13 @@ export default function CoordenadorDashboard({ user }) {
     }
   }
 
+  const getAnalistaName = (empresaId) => {
+    const uc = userCompanies.find(uc => uc.empresa_id === empresaId)
+    if (!uc) return 'Sem analista'
+    const analista = analistas.find(a => a.id === uc.user_id)
+    return analista?.nome || 'Não encontrado'
+  }
+
   // Estatísticas globais
   const stats = {
     total_empresas: companies.length,
@@ -183,13 +203,6 @@ export default function CoordenadorDashboard({ user }) {
     const extratosEmpresa = extratos.filter(e => e.empresa_id === c.id && e.status !== 'recebido')
     return extratosEmpresa.length >= 3
   })
-
-  const getAnalistaName = (empresaId) => {
-    const uc = userCompanies.find(uc => uc.empresa_id === empresaId)
-    if (!uc) return 'Sem analista'
-    const analista = analistas.find(a => a.id === uc.user_id)
-    return analista?.nome || 'Não encontrado'
-  }
 
   if (selectedCompany) {
     return (
@@ -279,25 +292,29 @@ export default function CoordenadorDashboard({ user }) {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">🏆 Ranking de Analistas</h2>
               <div className="space-y-3">
-                {statsAnalistas
-                  .sort((a, b) => b.progresso_geral - a.progresso_geral)
-                  .map((a, idx) => (
-                    <div key={a.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
-                        idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : 'bg-orange-600'
-                      }`}>
-                        {idx + 1}
+                {statsAnalistas.length === 0 ? (
+                  <p className="text-gray-600">Carregando analistas...</p>
+                ) : (
+                  statsAnalistas
+                    .sort((a, b) => b.progresso_geral - a.progresso_geral)
+                    .map((a, idx) => (
+                      <div key={a.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
+                          idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : 'bg-orange-600'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-800">{a.nome}</p>
+                          <p className="text-sm text-gray-600">{a.total_empresas} empresas</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-purple-600">{a.progresso_geral}%</p>
+                          <p className="text-xs text-gray-500">progresso geral</p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-800">{a.nome}</p>
-                        <p className="text-sm text-gray-600">{a.total_empresas} empresas</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-purple-600">{a.progresso_geral}%</p>
-                        <p className="text-xs text-gray-500">progresso geral</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                )}
               </div>
             </div>
           </div>
