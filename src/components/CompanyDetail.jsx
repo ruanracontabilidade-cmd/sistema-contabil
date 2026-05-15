@@ -607,50 +607,75 @@ export default function CompanyDetail({ company, onBack, user }) {
                   </button>
                 </div>
 
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-4">
                   {checklists.length === 0 ? (
                     <p className="text-gray-600 text-center py-4">Sem tarefas ainda</p>
                   ) : (
-                    checklists.map(cl => (
-                      <div
-                        key={cl.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg transition ${
-                          cl.concluida
-                            ? 'bg-green-50 border border-green-200'
-                            : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={cl.concluida}
-                          onChange={() => toggleChecklist(cl.id, cl.concluida)}
-                          className="w-5 h-5 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className={`${
-                              cl.concluida 
-                                ? 'line-through text-gray-500' 
-                                : 'text-gray-800'
-                            }`}>
-                              {cl.tarefa}
-                            </p>
-                            {cl.concluida && (
-                              <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                                ✅ Concluído
+                    Object.entries(
+                      checklists.reduce((acc, cl) => {
+                        if (!acc[cl.categoria]) {
+                          acc[cl.categoria] = []
+                        }
+                        acc[cl.categoria].push(cl)
+                        return acc
+                      }, {})
+                    ).map(([categoria, tarefas]) => {
+                      const tarefasConcluidasCategoria = tarefas.filter(t => t.concluida).length
+                      const totalTarefasCategoria = tarefas.length
+
+                      return (
+                        <div key={categoria} className="border rounded-lg overflow-hidden">
+                          <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 border-b">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-bold text-gray-800">{categoria}</h3>
+                              <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+                                {tarefasConcluidasCategoria}/{totalTarefasCategoria}
                               </span>
-                            )}
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-500">{cl.categoria}</p>
+
+                          <div className="divide-y">
+                            {tarefas.map(cl => (
+                              <div
+                                key={cl.id}
+                                className={`flex items-center gap-3 p-3 transition ${
+                                  cl.concluida
+                                    ? 'bg-green-50'
+                                    : 'bg-white hover:bg-gray-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={cl.concluida}
+                                  onChange={() => toggleChecklist(cl.id, cl.concluida)}
+                                  className="w-5 h-5 cursor-pointer flex-shrink-0"
+                                />
+                                <div className="flex-1">
+                                  <p className={`${
+                                    cl.concluida 
+                                      ? 'line-through text-gray-500' 
+                                      : 'text-gray-800'
+                                  }`}>
+                                    {cl.tarefa}
+                                  </p>
+                                </div>
+                                {cl.concluida && (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex-shrink-0">
+                                    ✅
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() => deletarTarefa(cl.id)}
+                                  className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex-shrink-0"
+                                >
+                                  Remover
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <button
-                          onClick={() => deletarTarefa(cl.id)}
-                          className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
-                        >
-                          Remover
-                        </button>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </div>
