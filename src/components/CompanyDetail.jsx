@@ -573,7 +573,11 @@ export default function CompanyDetail({ company, onBack, user }) {
                 <label className="block text-sm font-medium mb-3">Status do Mês</label>
                 <select
                   value={novoStatus}
-                  onChange={(e) => alterarStatus(e.target.value)}
+                  onChange={(e) => {
+                    const novoStatusValue = e.target.value
+                    setNovoStatus(novoStatusValue)
+                    alterarStatus(novoStatusValue)
+                  }}
                   className={`w-full px-4 py-2 rounded-lg font-medium border-2 ${getStatusColor(novoStatus)}`}
                 >
                   <option value="nao_iniciado">⭕ Não iniciado</option>
