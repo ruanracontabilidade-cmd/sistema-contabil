@@ -1,35 +1,19 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import CompanyChecklist from './CompanyChecklist'
+import CompanyExtrato from './CompanyExtrato'
 
 export default function CompanyDetail({ company, onBack, user }) {
   const [competencias, setCompetencias] = useState([])
   const [anoSelecionado, setAnoSelecionado] = useState(null)
   const [selectedCompetencia, setSelectedCompetencia] = useState(null)
-  const [checklists, setChecklists] = useState([])
-  const [extratos, setExtratos] = useState([])
   const [sessoesTrabaho, setSessoesTrabaho] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showChecklistModal, setShowChecklistModal] = useState(false)
-  const [novaChecklist, setNovaChecklist] = useState({ categoria: '', tarefa: '' })
-  const [showModalExtrato, setShowModalExtrato] = useState(false)
-  const [destinatario, setDestinatario] = useState('')
   const [sessaoTrabalho, setSessaoTrabalho] = useState(null)
+  const [novoStatus, setNovoStatus] = useState('')
   const [showPausarModal, setShowPausarModal] = useState(false)
   const [observacaoPausa, setObservacaoPausa] = useState('')
-  const [novoStatus, setNovoStatus] = useState('')
-  const [abaSelecionada, setAbaSelecionada] = useState('checklist')
-
-  const ordemCategorias = {
-    'Conciliação Bancária': 1,
-    'Aplicações': 2,
-    'Clientes & Adiantamentos': 3,
-    'Sócios': 4,
-    'Fornecedores & Notas Fiscais': 5,
-    'Impostos & Fiscal': 6,
-    'Folha de Pagamento': 7,
-    'Distribuição de Resultados': 8,
-    'Outras Contas': 9,
-  }
+  const [telaSelecionada, setTelaSelecionada] = useState('empresa')
 
   useEffect(() => {
     fetchAllData()
@@ -59,13 +43,6 @@ export default function CompanyDetail({ company, onBack, user }) {
         .eq('user_id', user.id)
 
       setSessoesTrabaho(sessoesData || [])
-
-      const { data: extratosData } = await supabase
-        .from('extratos')
-        .select('*')
-        .eq('empresa_id', company.id)
-
-      setExtratos(extratosData || [])
     } catch (error) {
       console.error('Erro:', error)
     } finally {
@@ -85,65 +62,6 @@ export default function CompanyDetail({ company, onBack, user }) {
     try {
       const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
 
-      const tarefasPadrao = [
-        { categoria: 'Conciliação Bancária', tarefa: 'Conciliar saldo bancário' },
-        { categoria: 'Conciliação Bancária', tarefa: 'Analisar diferenças' },
-        { categoria: 'Conciliação Bancária', tarefa: 'Resolver pendências' },
-        { categoria: 'Aplicações', tarefa: 'Analisar aplicações financeiras' },
-        { categoria: 'Clientes & Adiantamentos', tarefa: 'Analisar contas a receber' },
-        { categoria: 'Clientes & Adiantamentos', tarefa: 'Verificar adiantamentos' },
-        { categoria: 'Sócios', tarefa: 'Verificar contas de sócios' },
-        { categoria: 'Sócios', tarefa: 'Analisar pró-labore' },
-        { categoria: 'Fornecedores & Notas Fiscais', tarefa: 'Conciliar notas fiscais' },
-        { categoria: 'Fornecedores & Notas Fiscais', tarefa: 'Verificar contas a pagar' },
-        { categoria: 'Impostos & Fiscal', tarefa: 'Calcular IRPJ' },
-        { categoria: 'Impostos & Fiscal', tarefa: 'Calcular CSLL' },
-        { categoria: 'Impostos & Fiscal', tarefa: 'Apurar PIS/COFINS' },
-        { categoria: 'Folha de Pagamento', tarefa: 'Verificar salários' },
-        { categoria: 'Folha de Pagamento', tarefa: 'Calcular FGTS' },
-        { categoria: 'Folha de Pagamento', tarefa: 'Apurar INSS' },
-        { categoria: 'Folha de Pagamento', tarefa: 'Verificar descontos' },
-        { categoria: 'Folha de Pagamento', tarefa: 'Validar contribuições' },
-        { categoria: 'Folha de Pagamento', tarefa: 'Processar rescisões' },
-        { categoria: 'Folha de Pagamento', tarefa: 'Fechar folha mensal' },
-        { categoria: 'Distribuição de Resultados', tarefa: 'Calcular lucro/prejuízo' },
-        { categoria: 'Distribuição de Resultados', tarefa: 'Preparar distribuição' },
-        { categoria: 'Outras Contas', tarefa: 'Analisar estoques' },
-        { categoria: 'Outras Contas', tarefa: 'Verificar ativo imobilizado' },
-        { categoria: 'Outras Contas', tarefa: 'Analisar intangíveis' },
-        { categoria: 'Outras Contas', tarefa: 'Verificar provisões' },
-      ]
-
-      const { data: existentes } = await supabase
-        .from('checklist_status')
-        .select('id')
-        .eq('empresa_id', company.id)
-        .eq('mes', mesRef)
-        .limit(1)
-
-      if (!existentes || existentes.length === 0) {
-        const tarefasAInserir = tarefasPadrao.map(t => ({
-          empresa_id: company.id,
-          categoria: t.categoria,
-          tarefa: t.tarefa,
-          concluida: false,
-          mes: mesRef,
-        }))
-
-        const { error: insertError } = await supabase
-          .from('checklist_status')
-          .insert(tarefasAInserir)
-
-        if (insertError) console.error('Erro ao inserir checklists:', insertError)
-      }
-
-      const { data: checklistData } = await supabase
-        .from('checklist_status')
-        .select('*')
-        .eq('empresa_id', company.id)
-        .eq('mes', mesRef)
-        .order('categoria')
-
       const { data: sessaoData } = await supabase
         .from('sessoes_trabalho')
         .select('*')
@@ -152,7 +70,6 @@ export default function CompanyDetail({ company, onBack, user }) {
         .eq('mes', mesRef)
         .single()
 
-      setChecklists(checklistData || [])
       setSessaoTrabalho(sessaoData || null)
       setNovoStatus(sessaoData?.status || 'nao_iniciado')
     } catch (error) {
@@ -328,84 +245,6 @@ export default function CompanyDetail({ company, onBack, user }) {
     }
   }
 
-  const toggleChecklist = async (checklistId, concluida) => {
-    try {
-      await supabase
-        .from('checklist_status')
-        .update({ concluida: !concluida })
-        .eq('id', checklistId)
-
-      fetchChecklistAndSessao()
-    } catch (error) {
-      console.error('Erro:', error)
-    }
-  }
-
-  const adicionarChecklist = async () => {
-    if (!selectedCompetencia || !novaChecklist.categoria || !novaChecklist.tarefa) {
-      alert('Preencha categoria e tarefa')
-      return
-    }
-
-    try {
-      const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
-
-      await supabase.from('checklist_status').insert([{
-        empresa_id: company.id,
-        categoria: novaChecklist.categoria,
-        tarefa: novaChecklist.tarefa,
-        concluida: false,
-        mes: mesRef,
-      }])
-
-      setShowChecklistModal(false)
-      setNovaChecklist({ categoria: '', tarefa: '' })
-      fetchChecklistAndSessao()
-    } catch (error) {
-      console.error('Erro:', error)
-    }
-  }
-
-  const deletarTarefa = async (checklistId) => {
-    if (!confirm('Remover esta tarefa?')) return
-
-    try {
-      await supabase
-        .from('checklist_status')
-        .delete()
-        .eq('id', checklistId)
-
-      fetchChecklistAndSessao()
-    } catch (error) {
-      console.error('Erro:', error)
-      alert('Erro ao remover tarefa')
-    }
-  }
-
-  const solicitarExtrato = async () => {
-    if (!selectedCompetencia || !destinatario.trim()) {
-      alert('Preencha para quem foi solicitado')
-      return
-    }
-
-    try {
-      const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
-
-      await supabase.from('extratos').insert([{
-        empresa_id: company.id,
-        mes_ref: mesRef,
-        status: 'solicitado',
-        destinatario: destinatario,
-      }])
-
-      setShowModalExtrato(false)
-      setDestinatario('')
-      fetchAllData()
-    } catch (error) {
-      console.error('Erro:', error)
-    }
-  }
-
   const getStatusColor = (status) => {
     if (!status || status === 'nao_iniciado') return 'bg-gray-100 text-gray-700 border-gray-300'
     if (status === 'em_andamento') return 'bg-blue-100 text-blue-700 border-blue-300'
@@ -433,18 +272,6 @@ export default function CompanyDetail({ company, onBack, user }) {
     .filter(c => c.ano === anoSelecionado)
     .sort((a, b) => parseInt(a.mes) - parseInt(b.mes))
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <p className="text-gray-600">Carregando...</p>
-      </div>
-    )
-  }
-
-  const totalTarefas = checklists.length
-  const tarefasConcluidas = checklists.filter(c => c.concluida).length
-  const progresso = totalTarefas > 0 ? Math.round((tarefasConcluidas / totalTarefas) * 100) : 0
-
   const mesesMap = {
     '1': 'Jan', '2': 'Fev', '3': 'Mar', '4': 'Abr',
     '5': 'Mai', '6': 'Jun', '7': 'Jul', '8': 'Ago',
@@ -452,6 +279,38 @@ export default function CompanyDetail({ company, onBack, user }) {
     '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
     '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
     '09': 'Set'
+  }
+
+  // Renderizar tela de Checklist
+  if (telaSelecionada === 'checklist' && selectedCompetencia) {
+    return (
+      <CompanyChecklist
+        company={company}
+        onBack={() => setTelaSelecionada('empresa')}
+        user={user}
+        selectedCompetencia={selectedCompetencia}
+      />
+    )
+  }
+
+  // Renderizar tela de Extratos
+  if (telaSelecionada === 'extratos' && selectedCompetencia) {
+    return (
+      <CompanyExtrato
+        company={company}
+        onBack={() => setTelaSelecionada('empresa')}
+        user={user}
+        selectedCompetencia={selectedCompetencia}
+      />
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <p className="text-gray-600">Carregando...</p>
+      </div>
+    )
   }
 
   return (
@@ -476,7 +335,6 @@ export default function CompanyDetail({ company, onBack, user }) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Seletor de Ano e Meses */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <label className="block text-sm font-medium mb-3">Ano</label>
           <select
@@ -495,7 +353,7 @@ export default function CompanyDetail({ company, onBack, user }) {
           </select>
 
           <label className="block text-sm font-medium mb-3">Meses</label>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-6">
             {mesesDoAno.map(mes => {
               const status = getMesStatus(mes.mes, mes.ano)
               const isSelected = selectedCompetencia?.id === mes.id
@@ -525,21 +383,32 @@ export default function CompanyDetail({ company, onBack, user }) {
           </div>
         </div>
 
-        {/* Barra de Progresso */}
         {selectedCompetencia && (
           <>
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-bold text-gray-800">Progresso - {selectedCompetencia.mes}/{selectedCompetencia.ano}</h3>
-                <span className="text-xl font-bold text-blue-600">{progresso}%</span>
+            {/* Menu de Navegação */}
+            <div className="bg-white rounded-lg shadow-sm border-b mb-6">
+              <div className="flex">
+                <button
+                  onClick={() => setTelaSelecionada('empresa')}
+                  className={`flex-1 px-4 py-3 font-medium text-center border-b-2 transition ${
+                    telaSelecionada === 'empresa'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-gray-200 text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  📋 Checklist
+                </button>
+                <button
+                  onClick={() => setTelaSelecionada('extratos')}
+                  className={`flex-1 px-4 py-3 font-medium text-center border-b-2 transition ${
+                    telaSelecionada === 'extratos'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-gray-200 text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  📄 Extratos
+                </button>
               </div>
-              <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all duration-500"
-                  style={{ width: `${progresso}%` }}
-                ></div>
-              </div>
-              <p className="text-sm text-gray-600 mt-2">{tarefasConcluidas} de {totalTarefas} tarefas concluídas</p>
             </div>
 
             {/* Status da Sessão */}
@@ -556,13 +425,7 @@ export default function CompanyDetail({ company, onBack, user }) {
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                 <p className="text-sm font-bold text-green-800 mb-1">✅ CONCLUÍDO EM {selectedCompetencia.mes}/{selectedCompetencia.ano}</p>
                 <p className="text-sm text-green-700">
-                  Finalizado em {new Date(sessaoTrabalho.concluido_em).toLocaleDateString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                  Finalizado em {new Date(sessaoTrabalho.concluido_em).toLocaleDateString('pt-BR')}
                 </p>
               </div>
             )}
@@ -597,240 +460,9 @@ export default function CompanyDetail({ company, onBack, user }) {
                  '▶️ Iniciar Trabalho'}
               </button>
             </div>
-
-            {/* Abas */}
-            <div className="bg-white rounded-lg shadow-sm border-b mb-6">
-              <div className="flex">
-                <button
-                  onClick={() => setAbaSelecionada('checklist')}
-                  className={`flex-1 px-4 py-3 font-medium text-center border-b-2 transition ${
-                    abaSelecionada === 'checklist'
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-gray-200 text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  📋 Checklist ({tarefasConcluidas}/{totalTarefas})
-                </button>
-                <button
-                  onClick={() => setAbaSelecionada('extratos')}
-                  className={`flex-1 px-4 py-3 font-medium text-center border-b-2 transition ${
-                    abaSelecionada === 'extratos'
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-gray-200 text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  📄 Extratos
-                </button>
-              </div>
-            </div>
-
-            {/* ABA CHECKLIST */}
-            {abaSelecionada === 'checklist' && (
-              <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-gray-800">
-                    Checklist ({tarefasConcluidas}/{totalTarefas})
-                  </h2>
-                  <button
-                    onClick={() => setShowChecklistModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-                  >
-                    + Adicionar Tarefa Extra
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {checklists.length === 0 ? (
-                    <p className="text-gray-600 text-center py-4">Sem tarefas ainda</p>
-                  ) : (
-                    Object.entries(
-                      checklists.reduce((acc, cl) => {
-                        if (!acc[cl.categoria]) {
-                          acc[cl.categoria] = []
-                        }
-                        acc[cl.categoria].push(cl)
-                        return acc
-                      }, {})
-                    )
-                      .sort(([catA], [catB]) => {
-                        const ordemA = ordemCategorias[catA] || 999
-                        const ordemB = ordemCategorias[catB] || 999
-                        return ordemA - ordemB
-                      })
-                      .map(([categoria, tarefas]) => {
-                        const tarefasConcluidasCategoria = tarefas.filter(t => t.concluida).length
-                        const totalTarefasCategoria = tarefas.length
-
-                        return (
-                          <div key={categoria} className="border rounded-lg overflow-hidden">
-                            <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 border-b">
-                              <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-gray-800">{categoria}</h3>
-                                <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
-                                  {tarefasConcluidasCategoria}/{totalTarefasCategoria}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="divide-y">
-                              {tarefas.map(cl => (
-                                <div
-                                  key={cl.id}
-                                  className={`flex items-center gap-3 p-3 transition ${
-                                    cl.concluida
-                                      ? 'bg-green-50'
-                                      : 'bg-white hover:bg-gray-50'
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={cl.concluida}
-                                    onChange={() => toggleChecklist(cl.id, cl.concluida)}
-                                    className="w-5 h-5 cursor-pointer flex-shrink-0"
-                                  />
-                                  <div className="flex-1">
-                                    <p className={`${
-                                      cl.concluida 
-                                        ? 'line-through text-gray-500' 
-                                        : 'text-gray-800'
-                                    }`}>
-                                      {cl.tarefa}
-                                    </p>
-                                  </div>
-                                  {cl.concluida && (
-                                    <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex-shrink-0">
-                                      ✅
-                                    </span>
-                                  )}
-                                  <button
-                                    onClick={() => deletarTarefa(cl.id)}
-                                    className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex-shrink-0"
-                                  >
-                                    Remover
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      })
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ABA EXTRATOS */}
-            {abaSelecionada === 'extratos' && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-gray-800">Extratos</h2>
-                  <button
-                    onClick={() => setShowModalExtrato(true)}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-                  >
-                    + Solicitar
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {extratos.filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`).length === 0 ? (
-                    <p className="text-gray-600 text-center py-4">Sem extratos</p>
-                  ) : (
-                    extratos
-                      .filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`)
-                      .map(e => (
-                        <div key={e.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="font-medium text-gray-800">{e.destinatario}</p>
-                            <p className="text-xs text-gray-500">{e.mes_ref}</p>
-                          </div>
-                          <span className={`px-3 py-1 rounded text-xs font-medium ${
-                            e.status === 'recebido' ? 'bg-green-100 text-green-700' :
-                            e.status === 'atrasado' ? 'bg-red-100 text-red-700' :
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {e.status === 'recebido' ? '✅ Recebido' :
-                             e.status === 'atrasado' ? '⚠️ Atrasado' :
-                             '⏳ Solicitado'}
-                          </span>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
-
-      {/* Modal Adicionar Tarefa Extra */}
-      {showChecklistModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">Adicionar Tarefa Extra</h3>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Categoria"
-                value={novaChecklist.categoria}
-                onChange={(e) => setNovaChecklist({...novaChecklist, categoria: e.target.value})}
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Descrição da tarefa"
-                value={novaChecklist.tarefa}
-                onChange={(e) => setNovaChecklist({...novaChecklist, tarefa: e.target.value})}
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={() => setShowChecklistModal(false)}
-                className="flex-1 px-4 py-2 border rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={adicionarChecklist}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg"
-              >
-                Adicionar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Solicitar Extrato */}
-      {showModalExtrato && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">Solicitar Extrato</h3>
-            <input
-              type="text"
-              placeholder="Para quem foi solicitado?"
-              value={destinatario}
-              onChange={(e) => setDestinatario(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg mb-4"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowModalExtrato(false)}
-                className="flex-1 px-4 py-2 border rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={solicitarExtrato}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg"
-              >
-                Solicitar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal Pausar Trabalho */}
       {showPausarModal && (
@@ -841,7 +473,7 @@ export default function CompanyDetail({ company, onBack, user }) {
             <textarea
               value={observacaoPausa}
               onChange={(e) => setObservacaoPausa(e.target.value)}
-              placeholder="Ex: Cliente pediu para parar e fazer outra empresa primeiro..."
+              placeholder="Ex: Cliente pediu para parar..."
               className="w-full px-3 py-2 border rounded-lg mb-4 h-24 resize-none"
             />
             <div className="flex gap-2">
