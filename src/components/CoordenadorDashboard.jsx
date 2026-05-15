@@ -21,41 +21,59 @@ export default function CoordenadorDashboard({ user }) {
   }, [])
 
   const fetchAllData = async () => {
-    try {
-      setLoading(true)
+  try {
+    setLoading(true)
 
-      const { data: analistasData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('role', 'analista')
-        .order('nome')
+    // Buscar analistas
+    const { data: analistasData, error: analistasError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'analista')
+      .order('nome')
 
-      const { data: companiesData } = await supabase
-        .from('empresas')
-        .select('*')
-        .order('nome')
+    if (analistasError) throw analistasError
 
-      const { data: userCompaniesData } = await supabase
-        .from('user_companies')
-        .select('*')
+    // Buscar todas as empresas
+    const { data: companiesData, error: companiesError } = await supabase
+      .from('empresas')
+      .select('*')
+      .order('nome')
 
-      const { data: extratosData } = await supabase
-        .from('extratos')
-        .select('*')
+    if (companiesError) throw companiesError
 
-      const { data: checklistsData } = await supabase
-        .from('checklist_status')
-        .select('*')
+    // Buscar associações
+    const { data: userCompaniesData, error: ucError } = await supabase
+      .from('user_companies')
+      .select('*')
 
-      setAnalistas(analistasData || [])
-      setCompanies(companiesData || [])
-      setUserCompanies(userCompaniesData || [])
-      setExtratos(extratosData || [])
-      setChecklists(checklistsData || [])
-    } catch (error) {
-      console.error('Erro:', error)
-    } finally {
-      setLoading(false)
+    if (ucError) throw ucError
+
+    console.log('Analistas:', analistasData)
+    console.log('User Companies:', userCompaniesData)
+    console.log('Total companies:', companiesData?.length)
+
+    // Buscar extratos
+    const { data: extratosData } = await supabase
+      .from('extratos')
+      .select('*')
+
+    // Buscar checklists
+    const { data: checklistsData } = await supabase
+      .from('checklist_status')
+      .select('*')
+
+    setAnalistas(analistasData || [])
+    setCompanies(companiesData || [])
+    setUserCompanies(userCompaniesData || [])
+    setExtratos(extratosData || [])
+    setChecklists(checklistsData || [])
+
+    console.log('Data loaded successfully')
+  } catch (error) {
+    console.error('Erro ao carregar dados:', error)
+    alert('Erro ao carregar dados: ' + error.message)
+  } finally {
+    setLoading(false)
     }
   }
 
