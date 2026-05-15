@@ -105,7 +105,7 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       const { error } = await supabase
         .from('sessoes_trabalho')
-        .upsert([{
+        .insert([{
           empresa_id: company.id,
           user_id: user.id,
           mes: mesRef,
@@ -143,18 +143,35 @@ export default function CompanyDetail({ company, onBack, user }) {
         return
       }
 
-      const { error } = await supabase
+      // Tentar atualizar primeiro
+      const { data: updateData, error: updateError } = await supabase
         .from('sessoes_trabalho')
-        .upsert([{
-          empresa_id: company.id,
-          user_id: user.id,
-          mes: mesRef,
+        .update({
           status: novoStatusValue,
-          concluido_em: novoStatusValue === 'concluido' ? new Date().toISOString() : undefined,
+          concluido_em: novoStatusValue === 'concluido' ? new Date().toISOString() : null,
           atualizado_em: new Date().toISOString(),
-        }])
+        })
+        .eq('empresa_id', company.id)
+        .eq('user_id', user.id)
+        .eq('mes', mesRef)
 
-      if (error) throw error
+      if (updateError) throw updateError
+
+      // Se não atualizou nada, fazer insert
+      if (!updateData || updateData.length === 0) {
+        const { error: insertError } = await supabase
+          .from('sessoes_trabalho')
+          .insert([{
+            empresa_id: company.id,
+            user_id: user.id,
+            mes: mesRef,
+            status: novoStatusValue,
+            concluido_em: novoStatusValue === 'concluido' ? new Date().toISOString() : null,
+            atualizado_em: new Date().toISOString(),
+          }])
+
+        if (insertError) throw insertError
+      }
 
       const acaoMap = {
         'em_andamento': 'INICIOU',
