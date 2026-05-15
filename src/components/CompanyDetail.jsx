@@ -73,20 +73,27 @@ export default function CompanyDetail({ company, onBack, user }) {
 
   useEffect(() => {
     fetchCompetencias()
-    fetchData()
   }, [company.id])
+
+  useEffect(() => {
+    if (mesChecklistSelecionado) {
+      fetchData()
+    }
+  }, [mesChecklistSelecionado])
 
   const fetchCompetencias = async () => {
     try {
       const { data } = await supabase
         .from('competencias')
-        .select('mes')
+        .select('mes, ano')
+        .order('ano', { ascending: false })
         .order('mes', { ascending: false })
 
       if (data && data.length > 0) {
-        setCompetencias(data.map(c => c.mes))
-        setMesChecklistSelecionado(data[0].mes)
-        setMesExtratoSelecionado(data[0].mes)
+        const meses = data.map(c => c.mes)
+        setCompetencias(meses)
+        setMesChecklistSelecionado(meses[0])
+        setMesExtratoSelecionado(meses[0])
       }
     } catch (error) {
       console.error('Erro ao carregar competências:', error)
@@ -127,13 +134,6 @@ export default function CompanyDetail({ company, onBack, user }) {
       setLoading(false)
     }
   }
-
-  // Recarregar checklist quando mudar mês
-  useEffect(() => {
-    if (mesChecklistSelecionado) {
-      fetchData()
-    }
-  }, [mesChecklistSelecionado])
 
   const toggleTarefa = async (categoria, tarefa) => {
     const novoStatus = !checklists[categoria][tarefa]
@@ -229,13 +229,11 @@ export default function CompanyDetail({ company, onBack, user }) {
     return total > 0 ? Math.round((concluidas / total) * 100) : 0
   }
 
-  // Contar solicitações pendentes do mês selecionado
   const solicitacoesPendentes = extratos.filter(
     e => e.mes_ref === mesExtratoSelecionado && e.status !== 'recebido'
   ).length
   const temProblema = solicitacoesPendentes >= 3
 
-  // Extratos do mês selecionado
   const extratosMes = extratos.filter(e => e.mes_ref === mesExtratoSelecionado)
 
   const progresso = calcularProgresso()
@@ -302,10 +300,9 @@ export default function CompanyDetail({ company, onBack, user }) {
           <p className="text-gray-600">Carregando...</p>
         ) : aba === 'checklist' ? (
           <div>
-            {/* Seletor de Mês/Competência */}
             <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Selecione a Competência (Mês)
+                Competência (Mês/Ano)
               </label>
               <select
                 value={mesChecklistSelecionado}
@@ -320,7 +317,6 @@ export default function CompanyDetail({ company, onBack, user }) {
               </select>
             </div>
 
-            {/* Checklist */}
             <div className="space-y-6">
               {CATEGORIAS.map(categoria => {
                 const tarefas = TAREFAS[categoria]
@@ -369,12 +365,11 @@ export default function CompanyDetail({ company, onBack, user }) {
           </div>
         ) : (
           <div>
-            {/* Seletor de Mês para Extratos */}
             <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
               <div className="flex justify-between items-end gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Selecione a Competência (Mês)
+                    Competência (Mês/Ano)
                   </label>
                   <select
                     value={mesExtratoSelecionado}
@@ -401,7 +396,6 @@ export default function CompanyDetail({ company, onBack, user }) {
               </div>
             </div>
 
-            {/* Modal */}
             {showModalExtrato && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -443,7 +437,6 @@ export default function CompanyDetail({ company, onBack, user }) {
               </div>
             )}
 
-            {/* Lista de Extratos */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4">
                 Extratos - {mesExtratoSelecionado}
