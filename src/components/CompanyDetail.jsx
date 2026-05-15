@@ -62,9 +62,68 @@ export default function CompanyDetail({ company, onBack, user }) {
 
   useEffect(() => {
     if (selectedCompetencia) {
+      criarChecklistPadrao()
       fetchChecklistAndSessao()
     }
   }, [selectedCompetencia])
+
+  const criarChecklistPadrao = async () => {
+    if (!selectedCompetencia) return
+
+    try {
+      const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
+
+      const tarefasPadrao = [
+        { categoria: 'Conciliação Bancária', tarefa: 'Conciliar saldo bancário' },
+        { categoria: 'Conciliação Bancária', tarefa: 'Analisar diferenças' },
+        { categoria: 'Conciliação Bancária', tarefa: 'Resolver pendências' },
+        { categoria: 'Clientes & Adiantamentos', tarefa: 'Analisar contas a receber' },
+        { categoria: 'Clientes & Adiantamentos', tarefa: 'Verificar adiantamentos' },
+        { categoria: 'Sócios', tarefa: 'Verificar contas de sócios' },
+        { categoria: 'Sócios', tarefa: 'Analisar pró-labore' },
+        { categoria: 'Distribuição de Resultados', tarefa: 'Calcular lucro/prejuízo' },
+        { categoria: 'Distribuição de Resultados', tarefa: 'Preparar distribuição' },
+        { categoria: 'Aplicações', tarefa: 'Analisar aplicações financeiras' },
+        { categoria: 'Fornecedores & Notas Fiscais', tarefa: 'Conciliar notas fiscais' },
+        { categoria: 'Fornecedores & Notas Fiscais', tarefa: 'Verificar contas a pagar' },
+        { categoria: 'Impostos & Fiscal', tarefa: 'Calcular IRPJ' },
+        { categoria: 'Impostos & Fiscal', tarefa: 'Calcular CSLL' },
+        { categoria: 'Impostos & Fiscal', tarefa: 'Apurar PIS/COFINS' },
+        { categoria: 'Folha de Pagamento', tarefa: 'Verificar salários' },
+        { categoria: 'Folha de Pagamento', tarefa: 'Calcular FGTS' },
+        { categoria: 'Folha de Pagamento', tarefa: 'Apurar INSS' },
+        { categoria: 'Folha de Pagamento', tarefa: 'Verificar descontos' },
+        { categoria: 'Folha de Pagamento', tarefa: 'Validar contribuições' },
+        { categoria: 'Folha de Pagamento', tarefa: 'Processar rescisões' },
+        { categoria: 'Folha de Pagamento', tarefa: 'Fechar folha mensal' },
+        { categoria: 'Outras Contas', tarefa: 'Analisar estoques' },
+        { categoria: 'Outras Contas', tarefa: 'Verificar ativo imobilizado' },
+        { categoria: 'Outras Contas', tarefa: 'Analisar intangíveis' },
+        { categoria: 'Outras Contas', tarefa: 'Verificar provisões' },
+      ]
+
+      const { data: existentes } = await supabase
+        .from('checklist_status')
+        .select('id')
+        .eq('empresa_id', company.id)
+        .eq('mes', mesRef)
+        .limit(1)
+
+      if (!existentes || existentes.length === 0) {
+        const tarefasAInserir = tarefasPadrao.map(t => ({
+          empresa_id: company.id,
+          categoria: t.categoria,
+          tarefa: t.tarefa,
+          concluida: false,
+          mes: mesRef,
+        }))
+
+        await supabase.from('checklist_status').insert(tarefasAInserir)
+      }
+    } catch (error) {
+      console.error('Erro ao criar checklist padrão:', error)
+    }
+  }
 
   const fetchChecklistAndSessao = async () => {
     if (!selectedCompetencia) return
@@ -77,6 +136,7 @@ export default function CompanyDetail({ company, onBack, user }) {
         .select('*')
         .eq('empresa_id', company.id)
         .eq('mes', mesRef)
+        .order('categoria')
 
       const { data: sessaoData } = await supabase
         .from('sessoes_trabalho')
@@ -140,7 +200,6 @@ export default function CompanyDetail({ company, onBack, user }) {
         return
       }
 
-      // Se for "nao_iniciado", deletar o registro
       if (novoStatusValue === 'nao_iniciado') {
         await supabase
           .from('sessoes_trabalho')
@@ -155,7 +214,6 @@ export default function CompanyDetail({ company, onBack, user }) {
         return
       }
 
-      // Tentar atualizar primeiro
       const { data: updateData, error: updateError } = await supabase
         .from('sessoes_trabalho')
         .update({
@@ -169,7 +227,6 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       if (updateError) throw updateError
 
-      // Se não atualizou nada, fazer insert
       if (!updateData || updateData.length === 0) {
         const { error: insertError } = await supabase
           .from('sessoes_trabalho')
@@ -288,6 +345,22 @@ export default function CompanyDetail({ company, onBack, user }) {
     }
   }
 
+  const deletarTarefa = async (checklistId) => {
+    if (!confirm('Remover esta tarefa?')) return
+
+    try {
+      await supabase
+        .from('checklist_status')
+        .delete()
+        .eq('id', checklistId)
+
+      fetchChecklistAndSessao()
+    } catch (error) {
+      console.error('Erro:', error)
+      alert('Erro ao remover tarefa')
+    }
+  }
+
   const solicitarExtrato = async () => {
     if (!selectedCompetencia || !destinatario.trim()) {
       alert('Preencha para quem foi solicitado')
@@ -347,7 +420,7 @@ export default function CompanyDetail({ company, onBack, user }) {
     )
   }
 
-  const totalTarefas = 26
+  const totalTarefas = checklists.length
   const tarefasConcluidas = checklists.filter(c => c.concluida).length
   const progresso = totalTarefas > 0 ? Math.round((tarefasConcluidas / totalTarefas) * 100) : 0
 
@@ -502,7 +575,7 @@ export default function CompanyDetail({ company, onBack, user }) {
                   onClick={() => setShowChecklistModal(true)}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
                 >
-                  + Adicionar
+                  + Adicionar Tarefa Extra
                 </button>
               </div>
 
@@ -542,6 +615,12 @@ export default function CompanyDetail({ company, onBack, user }) {
                         </div>
                         <p className="text-xs text-gray-500">{cl.categoria}</p>
                       </div>
+                      <button
+                        onClick={() => deletarTarefa(cl.id)}
+                        className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                      >
+                        Remover
+                      </button>
                     </div>
                   ))
                 )}
@@ -590,11 +669,11 @@ export default function CompanyDetail({ company, onBack, user }) {
         )}
       </div>
 
-      {/* Modal Adicionar Checklist */}
+      {/* Modal Adicionar Tarefa Extra */}
       {showChecklistModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">Adicionar Tarefa</h3>
+            <h3 className="text-lg font-bold mb-4">Adicionar Tarefa Extra</h3>
             <div className="space-y-3">
               <input
                 type="text"
