@@ -3,9 +3,11 @@ import { supabase } from '../lib/supabase'
 
 export default function CompanyDetail({ company, onBack, user }) {
   const [competencias, setCompetencias] = useState([])
+  const [anoSelecionado, setAnoSelecionado] = useState(null)
   const [selectedCompetencia, setSelectedCompetencia] = useState(null)
   const [checklists, setChecklists] = useState([])
   const [extratos, setExtratos] = useState([])
+  const [sessoesTrabaho, setSessoesTrabaho] = useState([])
   const [loading, setLoading] = useState(true)
   const [showChecklistModal, setShowChecklistModal] = useState(false)
   const [novaChecklist, setNovaChecklist] = useState({ categoria: '', tarefa: '' })
@@ -14,10 +16,11 @@ export default function CompanyDetail({ company, onBack, user }) {
   const [sessaoTrabalho, setSessaoTrabalho] = useState(null)
   const [showPausarModal, setShowPausarModal] = useState(false)
   const [observacaoPausa, setObservacaoPausa] = useState('')
+  const [novoStatus, setNovoStatus] = useState('')
 
   useEffect(() => {
     fetchAllData()
-  }, [company.id, selectedCompetencia])
+  }, [company.id])
 
   const fetchAllData = async () => {
     try {
@@ -31,42 +34,66 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       setCompetencias(competenciasData || [])
 
-      if (competenciasData?.length > 0 && !selectedCompetencia) {
-        setSelectedCompetencia(competenciasData[0])
+      // Pegar ano mais recente
+      if (competenciasData?.length > 0) {
+        const anoMaisRecente = competenciasData[0].ano
+        setAnoSelecionado(anoMaisRecente)
       }
 
-      if (selectedCompetencia) {
-        const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
+      // Buscar todas as sessões dessa empresa
+      const { data: sessoesData } = await supabase
+        .from('sessoes_trabalho')
+        .select('*')
+        .eq('empresa_id', company.id)
+        .eq('user_id', user.id)
 
-        const { data: checklistData } = await supabase
-          .from('checklist_status')
-          .select('*')
-          .eq('empresa_id', company.id)
-          .eq('mes', mesRef)
+      setSessoesTrabaho(sessoesData || [])
 
-        const { data: extratosData } = await supabase
-          .from('extratos')
-          .select('*')
-          .eq('empresa_id', company.id)
-          .eq('mes_ref', mesRef)
+      // Buscar extratos
+      const { data: extratosData } = await supabase
+        .from('extratos')
+        .select('*')
+        .eq('empresa_id', company.id)
 
-        // Buscar sessão de trabalho
-        const { data: sessaoData } = await supabase
-          .from('sessoes_trabalho')
-          .select('*')
-          .eq('empresa_id', company.id)
-          .eq('user_id', user.id)
-          .eq('mes', mesRef)
-          .single()
-
-        setChecklists(checklistData || [])
-        setExtratos(extratosData || [])
-        setSessaoTrabalho(sessaoData || null)
-      }
+      setExtratos(extratosData || [])
     } catch (error) {
       console.error('Erro:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedCompetencia) {
+      fetchChecklistAndSessao()
+    }
+  }, [selectedCompetencia])
+
+  const fetchChecklistAndSessao = async () => {
+    if (!selectedCompetencia) return
+
+    try {
+      const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
+
+      const { data: checklistData } = await supabase
+        .from('checklist_status')
+        .select('*')
+        .eq('empresa_id', company.id)
+        .eq('mes', mesRef)
+
+      const { data: sessaoData } = await supabase
+        .from('sessoes_trabalho')
+        .select('*')
+        .eq('empresa_id', company.id)
+        .eq('user_id', user.id)
+        .eq('mes', mesRef)
+        .single()
+
+      setChecklists(checklistData || [])
+      setSessaoTrabalho(sessaoData || null)
+      setNovoStatus(sessaoData?.status || 'nao_iniciado')
+    } catch (error) {
+      console.error('Erro:', error)
     }
   }
 
@@ -89,7 +116,6 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       if (error) throw error
 
-      // Registrar atividade
       await supabase.from('atividades_log').insert([{
         empresa_id: company.id,
         user_id: user.id,
@@ -98,11 +124,57 @@ export default function CompanyDetail({ company, onBack, user }) {
         detalhe: `Iniciou trabalho em ${company.nome}`,
       }])
 
-      alert('Trabalho iniciado!')
-      fetchAllData()
+      setNovoStatus('em_andamento')
+      fetchChecklistAndSessao()
     } catch (error) {
       console.error('Erro:', error)
       alert('Erro ao iniciar: ' + error.message)
+    }
+  }
+
+  const alterarStatus = async (novoStatusValue) => {
+    if (!selectedCompetencia) return
+
+    try {
+      const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
+
+      if (novoStatusValue === 'pausado') {
+        setShowPausarModal(true)
+        return
+      }
+
+      const { error } = await supabase
+        .from('sessoes_trabalho')
+        .upsert([{
+          empresa_id: company.id,
+          user_id: user.id,
+          mes: mesRef,
+          status: novoStatusValue,
+          concluido_em: novoStatusValue === 'concluido' ? new Date().toISOString() : undefined,
+          atualizado_em: new Date().toISOString(),
+        }])
+
+      if (error) throw error
+
+      const acaoMap = {
+        'em_andamento': 'INICIOU',
+        'concluido': 'CONCLUIU',
+      }
+
+      await supabase.from('atividades_log').insert([{
+        empresa_id: company.id,
+        user_id: user.id,
+        mes: mesRef,
+        acao: acaoMap[novoStatusValue] || 'ATUALIZOU',
+        detalhe: `Mudou status para ${novoStatusValue}`,
+      }])
+
+      setNovoStatus(novoStatusValue)
+      fetchAllData()
+      fetchChecklistAndSessao()
+    } catch (error) {
+      console.error('Erro:', error)
+      alert('Erro ao alterar status: ' + error.message)
     }
   }
 
@@ -131,7 +203,6 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       if (error) throw error
 
-      // Registrar atividade
       await supabase.from('atividades_log').insert([{
         empresa_id: company.id,
         user_id: user.id,
@@ -140,49 +211,13 @@ export default function CompanyDetail({ company, onBack, user }) {
         detalhe: `Motivo: ${observacaoPausa}`,
       }])
 
-      alert('Trabalho pausado!')
+      setNovoStatus('pausado')
       setShowPausarModal(false)
       setObservacaoPausa('')
-      fetchAllData()
+      fetchChecklistAndSessao()
     } catch (error) {
       console.error('Erro:', error)
       alert('Erro ao pausar: ' + error.message)
-    }
-  }
-
-  const concluirMes = async () => {
-    if (!selectedCompetencia) return
-
-    try {
-      const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
-
-      const { error } = await supabase
-        .from('sessoes_trabalho')
-        .update({
-          status: 'concluido',
-          concluido_em: new Date().toISOString(),
-          atualizado_em: new Date().toISOString(),
-        })
-        .eq('empresa_id', company.id)
-        .eq('user_id', user.id)
-        .eq('mes', mesRef)
-
-      if (error) throw error
-
-      // Registrar atividade
-      await supabase.from('atividades_log').insert([{
-        empresa_id: company.id,
-        user_id: user.id,
-        mes: mesRef,
-        acao: 'CONCLUIU',
-        detalhe: `Finalizou ${company.nome} em ${mesRef}`,
-      }])
-
-      alert('Mês concluído!')
-      fetchAllData()
-    } catch (error) {
-      console.error('Erro:', error)
-      alert('Erro ao concluir: ' + error.message)
     }
   }
 
@@ -193,7 +228,7 @@ export default function CompanyDetail({ company, onBack, user }) {
         .update({ concluida: !concluida })
         .eq('id', checklistId)
 
-      fetchAllData()
+      fetchChecklistAndSessao()
     } catch (error) {
       console.error('Erro:', error)
     }
@@ -218,7 +253,7 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       setShowChecklistModal(false)
       setNovaChecklist({ categoria: '', tarefa: '' })
-      fetchAllData()
+      fetchChecklistAndSessao()
     } catch (error) {
       console.error('Erro:', error)
     }
@@ -249,20 +284,31 @@ export default function CompanyDetail({ company, onBack, user }) {
   }
 
   const getStatusColor = (status) => {
-    if (!status) return 'bg-gray-100 text-gray-700'
-    if (status === 'em_andamento') return 'bg-blue-100 text-blue-700'
-    if (status === 'pausado') return 'bg-yellow-100 text-yellow-700'
-    if (status === 'concluido') return 'bg-green-100 text-green-700'
+    if (!status || status === 'nao_iniciado') return 'bg-gray-100 text-gray-700 border-gray-300'
+    if (status === 'em_andamento') return 'bg-blue-100 text-blue-700 border-blue-300'
+    if (status === 'pausado') return 'bg-yellow-100 text-yellow-700 border-yellow-300'
+    if (status === 'concluido') return 'bg-green-100 text-green-700 border-green-300'
     return 'bg-gray-100 text-gray-700'
   }
 
   const getStatusLabel = (status) => {
-    if (!status) return '⭕ Não iniciado'
+    if (!status || status === 'nao_iniciado') return '⭕ Não iniciado'
     if (status === 'em_andamento') return '▶️ Em Andamento'
     if (status === 'pausado') return '⏸️ Pausado'
     if (status === 'concluido') return '✅ Concluído'
     return status
   }
+
+  const getMesStatus = (mes, ano) => {
+    const mesRef = `${mes}/${ano}`
+    const sessao = sessoesTrabaho.find(s => s.mes === mesRef)
+    return sessao?.status || 'nao_iniciado'
+  }
+
+  const anos = [...new Set(competencias.map(c => c.ano))].sort((a, b) => b - a)
+  const mesesDoAno = competencias
+    .filter(c => c.ano === anoSelecionado)
+    .sort((a, b) => parseInt(a.mes) - parseInt(b.mes))
 
   if (loading) {
     return (
@@ -272,7 +318,6 @@ export default function CompanyDetail({ company, onBack, user }) {
     )
   }
 
-  const mesAtual = selectedCompetencia ? `${selectedCompetencia.mes}/${selectedCompetencia.ano}` : ''
   const totalTarefas = 26
   const tarefasConcluidas = checklists.filter(c => c.concluida).length
   const progresso = totalTarefas > 0 ? Math.round((tarefasConcluidas / totalTarefas) * 100) : 0
@@ -281,170 +326,234 @@ export default function CompanyDetail({ company, onBack, user }) {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <button
               onClick={onBack}
-              className="text-blue-600 hover:text-blue-800 mb-2"
+              className="text-blue-600 hover:text-blue-800 mb-2 block"
             >
               ← Voltar
             </button>
             <h1 className="text-2xl font-bold text-gray-800">{company.nome}</h1>
           </div>
-          <div className={`px-4 py-2 rounded-lg font-medium ${getStatusColor(sessaoTrabalho?.status)}`}>
-            {getStatusLabel(sessaoTrabalho?.status)}
+          <div className="flex items-center gap-2">
+            <select
+              value={novoStatus}
+              onChange={(e) => alterarStatus(e.target.value)}
+              className={`px-4 py-2 rounded-lg font-medium border-2 ${getStatusColor(novoStatus)}`}
+            >
+              <option value="nao_iniciado">⭕ Não iniciado</option>
+              <option value="em_andamento">▶️ Em Andamento</option>
+              <option value="pausado">⏸️ Pausado</option>
+              <option value="concluido">✅ Concluído</option>
+            </select>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Seletor de Competência */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Mês/Ano</label>
+        {/* Seletor de Ano e Meses */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <label className="block text-sm font-medium mb-3">Ano</label>
           <select
-            value={selectedCompetencia?.id || ''}
+            value={anoSelecionado || ''}
             onChange={(e) => {
-              const comp = competencias.find(c => c.id === e.target.value)
-              setSelectedCompetencia(comp)
+              setAnoSelecionado(parseInt(e.target.value))
+              setSelectedCompetencia(null)
             }}
-            className="w-full md:w-48 px-4 py-2 border rounded-lg"
+            className="w-full md:w-48 px-4 py-2 border rounded-lg mb-4"
           >
-            {competencias.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.mes}/{c.ano}
+            {anos.map(ano => (
+              <option key={ano} value={ano}>
+                {ano}
               </option>
             ))}
           </select>
+
+          <label className="block text-sm font-medium mb-3">Meses</label>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+            {mesesDoAno.map(mes => {
+              const status = getMesStatus(mes.mes, mes.ano)
+              const isSelected = selectedCompetencia?.id === mes.id
+              const mesesMap = {
+                '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+                '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+                '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+              }
+
+              let bgColor = 'bg-gray-50 border-gray-200'
+              if (isSelected) bgColor = 'bg-blue-100 border-blue-300'
+              if (status === 'concluido') bgColor = 'bg-green-100 border-green-300'
+              if (status === 'pausado') bgColor = 'bg-yellow-100 border-yellow-200'
+              if (status === 'em_andamento') bgColor = 'bg-blue-50 border-blue-200'
+
+              return (
+                <button
+                  key={mes.id}
+                  onClick={() => setSelectedCompetencia(mes)}
+                  className={`px-3 py-2 rounded-lg font-medium border-2 transition ${bgColor}`}
+                >
+                  <div className="text-sm">{mesesMap[mes.mes]}</div>
+                  <div className="text-xs mt-1">
+                    {status === 'concluido' && '✅'}
+                    {status === 'em_andamento' && '▶️'}
+                    {status === 'pausado' && '⏸️'}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Barra de Progresso */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-bold text-gray-800">Progresso Geral</h3>
-            <span className="text-xl font-bold text-blue-600">{progresso}%</span>
-          </div>
-          <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-600 transition-all"
-              style={{ width: `${progresso}%` }}
-            ></div>
-          </div>
-        </div>
+        {selectedCompetencia && (
+          <>
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-gray-800">Progresso - {selectedCompetencia.mes}/{selectedCompetencia.ano}</h3>
+                <span className="text-xl font-bold text-blue-600">{progresso}%</span>
+              </div>
+              <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 transition-all duration-500"
+                  style={{ width: `${progresso}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">{tarefasConcluidas} de {totalTarefas} tarefas concluídas</p>
+            </div>
 
-        {/* Botões de Ação */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex gap-2 flex-wrap">
-            {!sessaoTrabalho || sessaoTrabalho.status === 'concluido' ? (
-              <button
-                onClick={iniciarTrabalho}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
-              >
-                ▶️ Iniciar Trabalho
-              </button>
-            ) : sessaoTrabalho.status === 'em_andamento' ? (
-              <>
-                <button
-                  onClick={() => setShowPausarModal(true)}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium"
-                >
-                  ⏸️ Pausar
-                </button>
-                <button
-                  onClick={concluirMes}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
-                >
-                  ✅ Concluir Mês
-                </button>
-              </>
-            ) : sessaoTrabalho.status === 'pausado' ? (
-              <>
+            {/* Status da Sessão */}
+            {sessaoTrabalho?.status === 'pausado' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <p className="text-sm font-bold text-yellow-800 mb-2">⏸️ TRABALHO PAUSADO</p>
+                <p className="text-sm text-yellow-700">
+                  <strong>Motivo:</strong> {sessaoTrabalho.observacao}
+                </p>
+              </div>
+            )}
+
+            {sessaoTrabalho?.status === 'concluido' && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <p className="text-sm font-bold text-green-800 mb-1">✅ CONCLUÍDO EM {selectedCompetencia.mes}/{selectedCompetencia.ano}</p>
+                <p className="text-sm text-green-700">
+                  Finalizado em {new Date(sessaoTrabalho.concluido_em).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+            )}
+
+            {/* Botão Iniciar Trabalho */}
+            {(!sessaoTrabalho || sessaoTrabalho.status === 'concluido') && (
+              <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <button
                   onClick={iniciarTrabalho}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition"
                 >
-                  ▶️ Retomar
+                  ▶️ Iniciar Trabalho
                 </button>
-                <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-800 font-medium">Motivo da pausa:</p>
-                  <p className="text-sm text-yellow-700">{sessaoTrabalho.observacao}</p>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
+              </div>
+            )}
 
-        {/* Checklist */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Checklist ({tarefasConcluidas}/{totalTarefas})</h2>
-            <button
-              onClick={() => setShowChecklistModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-            >
-              + Adicionar
-            </button>
-          </div>
-
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {checklists.length === 0 ? (
-              <p className="text-gray-600 text-center py-4">Sem tarefas ainda</p>
-            ) : (
-              checklists.map(cl => (
-                <div
-                  key={cl.id}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100"
+            {/* Checklist */}
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">
+                  Checklist ({tarefasConcluidas}/{totalTarefas})
+                </h2>
+                <button
+                  onClick={() => setShowChecklistModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
                 >
-                  <input
-                    type="checkbox"
-                    checked={cl.concluida}
-                    onChange={() => toggleChecklist(cl.id, cl.concluida)}
-                    className="w-5 h-5 cursor-pointer"
-                  />
-                  <div className="flex-1">
-                    <p className={`${cl.concluida ? 'line-through text-gray-500' : 'text-gray-800'}`}>
-                      {cl.tarefa}
-                    </p>
-                    <p className="text-xs text-gray-500">{cl.categoria}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+                  + Adicionar
+                </button>
+              </div>
 
-        {/* Extratos */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Extratos</h2>
-            <button
-              onClick={() => setShowModalExtrato(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-            >
-              + Solicitar
-            </button>
-          </div>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {checklists.length === 0 ? (
+                  <p className="text-gray-600 text-center py-4">Sem tarefas ainda</p>
+                ) : (
+                  checklists.map(cl => (
+                    <div
+                      key={cl.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg transition ${
+                        cl.concluida
+                          ? 'bg-green-50 border border-green-200'
+                          : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={cl.concluida}
+                        onChange={() => toggleChecklist(cl.id, cl.concluida)}
+                        className="w-5 h-5 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className={`${
+                            cl.concluida 
+                              ? 'line-through text-gray-500' 
+                              : 'text-gray-800'
+                          }`}>
+                            {cl.tarefa}
+                          </p>
+                          {cl.concluida && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                              ✅ Concluído
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">{cl.categoria}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
 
-          <div className="space-y-2">
-            {extratos.length === 0 ? (
-              <p className="text-gray-600 text-center py-4">Sem extratos</p>
-            ) : (
-              extratos.map(e => (
-                <div key={e.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-800">{e.destinatario}</p>
-                    <p className="text-xs text-gray-500">{e.mes_ref}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded text-xs font-medium ${
-                    e.status === 'recebido' ? 'bg-green-100 text-green-700' :
-                    e.status === 'atrasado' ? 'bg-red-100 text-red-700' :
-                    'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {e.status}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+            {/* Extratos */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">Extratos</h2>
+                <button
+                  onClick={() => setShowModalExtrato(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                >
+                  + Solicitar
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {extratos.filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`).length === 0 ? (
+                  <p className="text-gray-600 text-center py-4">Sem extratos</p>
+                ) : (
+                  extratos
+                    .filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`)
+                    .map(e => (
+                      <div key={e.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-800">{e.destinatario}</p>
+                          <p className="text-xs text-gray-500">{e.mes_ref}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${
+                          e.status === 'recebido' ? 'bg-green-100 text-green-700' :
+                          e.status === 'atrasado' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {e.status === 'recebido' ? '✅ Recebido' :
+                           e.status === 'atrasado' ? '⚠️ Atrasado' :
+                           '⏳ Solicitado'}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal Adicionar Checklist */}
