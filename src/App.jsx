@@ -6,47 +6,67 @@ import CoordenadorDashboard from './components/CoordenadorDashboard'
 
 export default function App() {
   const [user, setUser] = useState(null)
-  const [userRole, setUserRole] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [userRole, setUserRole] = useState(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user)
-        fetchUserRole(session.user.email)
-      } else {
+    const checkUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user?.email) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id, email, role')
+            .eq('email', session.user.email)
+            .single()
+
+          if (userData) {
+            setUser(userData)
+            setUserRole(userData.role)
+          }
+        }
+      } catch (error) {
+        console.error('Erro:', error)
+      } finally {
         setLoading(false)
       }
-    })
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        fetchUserRole(session.user.email)
-      } else {
-        setUser(null)
-        setUserRole(null)
-        setLoading(false)
-      }
-    })
-
-    return () => subscription?.unsubscribe()
+    checkUser()
   }, [])
 
-  const fetchUserRole = async (email) => {
+  const handleLogin = async (email, password) => {
     try {
-      const { data } = await supabase
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+
+      const { data: userData } = await supabase
         .from('users')
-        .select('role')
+        .select('id, email, role')
         .eq('email', email)
         .single()
 
-      setUserRole(data?.role || 'analista')
+      if (userData) {
+        setUser(userData)
+        setUserRole(userData.role)
+      }
     } catch (error) {
-      console.error('Erro ao buscar role:', error)
-      setUserRole('analista')
-    } finally {
-      setLoading(false)
+      alert('Erro ao fazer login: ' + error.message)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setUserRole(null)
+    } catch (error) {
+      alert('Erro ao fazer logout: ' + error.message)
     }
   }
 
@@ -59,12 +79,16 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login onLogin={setUser} />
+    return <Login onLogin={handleLogin} />
   }
 
-  if (userRole === 'coordenador') {
-    return <CoordenadorDashboard user={user} />
-  }
-
-  return <Dashboard user={user} />
+  return (
+    <>
+      {userRole === 'coordenador' ? (
+        <CoordenadorDashboard user={user} onLogout={handleLogout} />
+      ) : (
+        <Dashboard user={user} onLogout={handleLogout} />
+      )}
+    </>
+  )
 }
