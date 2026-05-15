@@ -468,16 +468,9 @@ export default function CompanyDetail({ company, onBack, user }) {
             <h1 className="text-2xl font-bold text-gray-800">{company.nome}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <select
-              value={novoStatus}
-              onChange={(e) => alterarStatus(e.target.value)}
-              className={`px-4 py-2 rounded-lg font-medium border-2 ${getStatusColor(novoStatus)}`}
-            >
-              <option value="nao_iniciado">⭕ Não iniciado</option>
-              <option value="em_andamento">▶️ Em Andamento</option>
-              <option value="pausado">⏸️ Pausado</option>
-              <option value="concluido">✅ Concluído</option>
-            </select>
+            <span className={`px-4 py-2 rounded-lg font-medium border-2 ${getStatusColor(novoStatus)}`}>
+              {getStatusLabel(novoStatus)}
+            </span>
           </div>
         </div>
       </div>
@@ -574,20 +567,32 @@ export default function CompanyDetail({ company, onBack, user }) {
               </div>
             )}
 
-            {/* Botão Iniciar Trabalho */}
-            {selectedCompetencia && (
-              <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                <button
-                  onClick={iniciarTrabalho}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition"
+            {/* Dropdown de Status e Botão Iniciar Trabalho */}
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-3">Status do Mês</label>
+                <select
+                  value={novoStatus}
+                  onChange={(e) => alterarStatus(e.target.value)}
+                  className={`w-full px-4 py-2 rounded-lg font-medium border-2 ${getStatusColor(novoStatus)}`}
                 >
-                  {sessaoTrabalho?.status === 'pausado' ? '▶️ Retomar Trabalho' : 
-                   sessaoTrabalho?.status === 'em_andamento' ? '▶️ Continuar Trabalho' :
-                   sessaoTrabalho?.status === 'concluido' ? '▶️ Recomeçar Trabalho' :
-                   '▶️ Iniciar Trabalho'}
-                </button>
+                  <option value="nao_iniciado">⭕ Não iniciado</option>
+                  <option value="em_andamento">▶️ Em Andamento</option>
+                  <option value="pausado">⏸️ Pausado</option>
+                  <option value="concluido">✅ Concluído</option>
+                </select>
               </div>
-            )}
+
+              <button
+                onClick={iniciarTrabalho}
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition"
+              >
+                {sessaoTrabalho?.status === 'pausado' ? '▶️ Retomar Trabalho' : 
+                 sessaoTrabalho?.status === 'em_andamento' ? '▶️ Continuar Trabalho' :
+                 sessaoTrabalho?.status === 'concluido' ? '▶️ Recomeçar Trabalho' :
+                 '▶️ Iniciar Trabalho'}
+              </button>
+            </div>
 
             {/* Abas */}
             <div className="bg-white rounded-lg shadow-sm border-b mb-6">
