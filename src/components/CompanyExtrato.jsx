@@ -84,6 +84,10 @@ export default function CompanyExtrato({ company, onBack, user, selectedCompeten
 
     try {
       const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
+      const novaSolicitacao = {
+        data: new Date().toISOString(),
+        status: 'solicitado'
+      }
 
       await supabase.from('extratos').insert([{
         empresa_id: company.id,
@@ -92,6 +96,7 @@ export default function CompanyExtrato({ company, onBack, user, selectedCompeten
         destinatario: destinatario,
         bancos_enviados: bancosEnviados,
         bancos_importados: [],
+        solicitacoes: [novaSolicitacao]
       }])
 
       setShowModalExtrato(false)
@@ -101,6 +106,33 @@ export default function CompanyExtrato({ company, onBack, user, selectedCompeten
     } catch (error) {
       console.error('Erro:', error)
       alert('Erro ao solicitar extrato')
+    }
+  }
+
+  const solicitarNovamente = async (extrato) => {
+    try {
+      const solicitacoesAtualizadas = [...(extrato.solicitacoes || []), {
+        data: new Date().toISOString(),
+        status: 'solicitado'
+      }]
+
+      let novoStatus = 'solicitado'
+      if (solicitacoesAtualizadas.length > 3) {
+        novoStatus = 'atrasado'
+      }
+
+      await supabase
+        .from('extratos')
+        .update({
+          solicitacoes: solicitacoesAtualizadas,
+          status: novoStatus
+        })
+        .eq('id', extrato.id)
+
+      fetchExtratos()
+    } catch (error) {
+      console.error('Erro:', error)
+      alert('Erro ao solicitar novamente')
     }
   }
 
@@ -130,11 +162,17 @@ export default function CompanyExtrato({ company, onBack, user, selectedCompeten
     if (!extratoSelecionado) return
 
     try {
+      const solicitacoesAtualizadas = extratoSelecionado.solicitacoes || []
+      if (solicitacoesAtualizadas.length > 0) {
+        solicitacoesAtualizadas[solicitacoesAtualizadas.length - 1].status = 'recebido'
+      }
+
       await supabase
         .from('extratos')
         .update({
           status: 'recebido',
           bancos_importados: bancosImportados,
+          solicitacoes: solicitacoesAtualizadas
         })
         .eq('id', extratoSelecionado.id)
 
@@ -246,67 +284,102 @@ export default function CompanyExtrato({ company, onBack, user, selectedCompeten
               {extratosDoMes.length === 0 ? (
                 <p className="text-gray-600 text-center py-8">Nenhum extrato solicitado</p>
               ) : (
-                extratosDoMes.map(e => (
-                  <div key={e.id} className="border rounded-lg p-4 bg-gray-50">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className="font-medium text-gray-800">{e.destinatario}</p>
-                        <p className="text-xs text-gray-500">{e.mes_ref}</p>
+                extratosDoMes.map(e => {
+                  const numSolicitacoes = (e.solicitacoes || []).length
+
+                  return (
+                    <div key={e.id} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="font-medium text-gray-800">{e.destinatario}</p>
+                          <p className="text-xs text-gray-500">{e.mes_ref}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap ${
+                          e.status === 'recebido' ? 'bg-green-100 text-green-700' :
+                          e.status === 'atrasado' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {e.status === 'recebido' ? '✅ Recebido' :
+                           e.status === 'atrasado' ? '⚠️ Atrasado' :
+                           '⏳ Solicitado'}
+                        </span>
                       </div>
-                      <span className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap ${
-                        e.status === 'recebido' ? 'bg-green-100 text-green-700' :
-                        e.status === 'atrasado' ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {e.status === 'recebido' ? '✅ Recebido' :
-                         e.status === 'atrasado' ? '⚠️ Atrasado' :
-                         '⏳ Solicitado'}
-                      </span>
+
+                      {/* Histórico de Solicitações */}
+                      {e.solicitacoes && e.solicitacoes.length > 0 && (
+                        <div className="mb-3 bg-white p-3 rounded border border-gray-200">
+                          <p className="text-xs font-medium text-gray-700 mb-2">📋 Histórico ({numSolicitacoes}):</p>
+                          <div className="space-y-1 max-h-40 overflow-y-auto">
+                            {e.solicitacoes.map((sol, idx) => (
+                              <div key={idx} className="text-xs text-gray-600 flex justify-between">
+                                <span>
+                                  #{idx + 1} - {new Date(sol.data).toLocaleDateString('pt-BR')} {new Date(sol.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span className={`font-medium ${
+                                  sol.status === 'recebido' ? 'text-green-600' : 'text-yellow-600'
+                                }`}>
+                                  {sol.status === 'recebido' ? '✓' : '○'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bancos Enviados */}
+                      {e.bancos_enviados && e.bancos_enviados.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs font-medium text-gray-700 mb-2">📤 Bancos Enviados:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {e.bancos_enviados.map((banco, idx) => (
+                              <span key={idx} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
+                                {banco}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bancos Importados */}
+                      {e.bancos_importados && e.bancos_importados.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs font-medium text-gray-700 mb-2">📥 Bancos Importados:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {e.bancos_importados.map((banco, idx) => (
+                              <span key={idx} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                                {banco}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Botões */}
+                      <div className="flex gap-2 mt-3">
+                        {e.status === 'solicitado' && (
+                          <button
+                            onClick={() => solicitarNovamente(e)}
+                            className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded text-sm font-medium"
+                          >
+                            🔄 Solicitado Novamente
+                          </button>
+                        )}
+                        {e.status !== 'recebido' && (
+                          <button
+                            onClick={() => {
+                              setExtratoSelecionado(e)
+                              setBancosImportados(e.bancos_importados || [])
+                              setShowModalImportar(true)
+                            }}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-medium"
+                          >
+                            ✓ Adicionar Bancos Importados
+                          </button>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Bancos Enviados */}
-                    {e.bancos_enviados && e.bancos_enviados.length > 0 && (
-                      <div className="mb-3">
-                        <p className="text-xs font-medium text-gray-700 mb-2">📤 Bancos Enviados:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {e.bancos_enviados.map((banco, idx) => (
-                            <span key={idx} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
-                              {banco}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Bancos Importados */}
-                    {e.bancos_importados && e.bancos_importados.length > 0 && (
-                      <div className="mb-3">
-                        <p className="text-xs font-medium text-gray-700 mb-2">📥 Bancos Importados:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {e.bancos_importados.map((banco, idx) => (
-                            <span key={idx} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                              {banco}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Botão para marcar como recebido/importado */}
-                    {e.status === 'solicitado' && (
-                      <button
-                        onClick={() => {
-                          setExtratoSelecionado(e)
-                          setBancosImportados(e.bancos_importados || [])
-                          setShowModalImportar(true)
-                        }}
-                        className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-medium"
-                      >
-                        ✓ Adicionar Bancos Importados
-                      </button>
-                    )}
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
