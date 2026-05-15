@@ -65,6 +65,8 @@ export default function CompanyDetail({ company, onBack, user }) {
   const [checklists, setChecklists] = useState({})
   const [extratos, setExtratos] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showModalExtrato, setShowModalExtrato] = useState(false)
+  const [destinatario, setDestinatario] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -93,7 +95,7 @@ export default function CompanyDetail({ company, onBack, user }) {
         .from('extratos')
         .select('*')
         .eq('empresa_id', company.id)
-        .order('mes_ref', { ascending: false })
+        .order('created_at', { ascending: false })
 
       setExtratos(extratosData || [])
     } catch (error) {
@@ -144,6 +146,11 @@ export default function CompanyDetail({ company, onBack, user }) {
   }
 
   const adicionarExtrato = async () => {
+    if (!destinatario.trim()) {
+      alert('Por favor, preencha para quem foi solicitado')
+      return
+    }
+
     const mes = new Date()
     const mesRef = `${String(mes.getMonth() + 1).padStart(2, '0')}/${mes.getFullYear()}`
 
@@ -154,11 +161,15 @@ export default function CompanyDetail({ company, onBack, user }) {
           empresa_id: company.id,
           mes_ref: mesRef,
           status: 'solicitado',
+          destinatario: destinatario,
         }])
 
+      setDestinatario('')
+      setShowModalExtrato(false)
       fetchData()
     } catch (error) {
       console.error('Erro:', error)
+      alert('Erro ao solicitar extrato')
     }
   }
 
@@ -189,6 +200,10 @@ export default function CompanyDetail({ company, onBack, user }) {
     return total > 0 ? Math.round((concluidas / total) * 100) : 0
   }
 
+  // Contar solicitações pendentes
+  const solicitacoesPendentes = extratos.filter(e => e.status !== 'recebido').length
+  const temProblema = solicitacoesPendentes >= 3
+
   const progresso = calcularProgresso()
 
   return (
@@ -204,6 +219,11 @@ export default function CompanyDetail({ company, onBack, user }) {
             </button>
             <h1 className="text-2xl font-bold text-gray-800">{company.nome}</h1>
             <p className="text-gray-600 text-sm">{company.cnpj}</p>
+            {temProblema && (
+              <div className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium inline-block">
+                ⚠️ Cliente não manda extratos
+              </div>
+            )}
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-600 mb-1">Progresso</p>
@@ -238,7 +258,7 @@ export default function CompanyDetail({ company, onBack, user }) {
                 : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
-            📄 Extratos
+            📄 Extratos ({solicitacoesPendentes})
           </button>
         </div>
       </div>
@@ -295,21 +315,77 @@ export default function CompanyDetail({ company, onBack, user }) {
         ) : (
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex justify-between items-center mb-6 pb-4 border-b">
-              <h3 className="text-lg font-bold text-gray-800">Controle de Extratos</h3>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Controle de Extratos</h3>
+                <p className="text-sm text-gray-500 mt-1">Solicitações pendentes: {solicitacoesPendentes}</p>
+              </div>
               <button
-                onClick={adicionarExtrato}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+                onClick={() => setShowModalExtrato(true)}
+                className={`px-4 py-2 rounded-lg transition text-white font-medium ${
+                  temProblema
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 + Solicitar Novo
               </button>
             </div>
+
+            {/* Modal para preencher destinatário */}
+            {showModalExtrato && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Solicitar Novo Extrato</h3>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Para quem foi solicitado?
+                    </label>
+                    <input
+                      type="text"
+                      value={destinatario}
+                      onChange={(e) => setDestinatario(e.target.value)}
+                      placeholder="Ex: João (Gerente), Maria (Contato)"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setShowModalExtrato(false)
+                        setDestinatario('')
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={adicionarExtrato}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Solicitar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               {extratos.length === 0 ? (
                 <p className="text-gray-600 text-center py-8">Nenhum extrato solicitado</p>
               ) : (
                 extratos.map(extrato => (
-                  <div key={extrato.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div 
+                    key={extrato.id} 
+                    className={`flex items-center justify-between p-4 rounded-lg border transition ${
+                      extrato.status === 'recebido'
+                        ? 'bg-green-50 border-green-200'
+                        : extrato.status === 'atrasado'
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
                     <div className="flex items-center gap-4 flex-1">
                       <span className="text-2xl">
                         {extrato.status === 'recebido' && '✅'}
@@ -317,7 +393,12 @@ export default function CompanyDetail({ company, onBack, user }) {
                         {extrato.status === 'atrasado' && '⚠️'}
                         {extrato.status === 'solicitado' && '📧'}
                       </span>
-                      <p className="font-semibold text-gray-800">{extrato.mes_ref}</p>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-800">{extrato.mes_ref}</p>
+                        <p className="text-xs text-gray-500">
+                          Solicitado para: {extrato.destinatario || 'Não informado'}
+                        </p>
+                      </div>
                     </div>
 
                     <select
