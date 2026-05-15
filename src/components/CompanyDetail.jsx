@@ -567,13 +567,13 @@ export default function CompanyDetail({ company, onBack, user }) {
             )}
 
             {/* Botão Iniciar Trabalho */}
-            {(!sessaoTrabalho || sessaoTrabalho.status === 'concluido') && (
+            {(!sessaoTrabalho || sessaoTrabalho.status === 'concluido' || sessaoTrabalho.status === 'pausado') && (
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <button
                   onClick={iniciarTrabalho}
                   className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition"
                 >
-                  ▶️ Iniciar Trabalho
+                  {sessaoTrabalho?.status === 'pausado' ? '▶️ Retomar Trabalho' : '▶️ Iniciar Trabalho'}
                 </button>
               </div>
             )}
