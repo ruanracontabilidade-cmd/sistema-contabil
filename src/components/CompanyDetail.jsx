@@ -19,6 +19,18 @@ export default function CompanyDetail({ company, onBack, user }) {
   const [novoStatus, setNovoStatus] = useState('')
   const [abaSelecionada, setAbaSelecionada] = useState('checklist')
 
+  const ordemCategorias = {
+    'Conciliação Bancária': 1,
+    'Aplicações': 2,
+    'Clientes & Adiantamentos': 3,
+    'Sócios': 4,
+    'Fornecedores & Notas Fiscais': 5,
+    'Impostos & Fiscal': 6,
+    'Folha de Pagamento': 7,
+    'Distribuição de Resultados': 8,
+    'Outras Contas': 9,
+  }
+
   useEffect(() => {
     fetchAllData()
   }, [company.id])
@@ -78,13 +90,11 @@ export default function CompanyDetail({ company, onBack, user }) {
         { categoria: 'Conciliação Bancária', tarefa: 'Conciliar saldo bancário' },
         { categoria: 'Conciliação Bancária', tarefa: 'Analisar diferenças' },
         { categoria: 'Conciliação Bancária', tarefa: 'Resolver pendências' },
+        { categoria: 'Aplicações', tarefa: 'Analisar aplicações financeiras' },
         { categoria: 'Clientes & Adiantamentos', tarefa: 'Analisar contas a receber' },
         { categoria: 'Clientes & Adiantamentos', tarefa: 'Verificar adiantamentos' },
         { categoria: 'Sócios', tarefa: 'Verificar contas de sócios' },
         { categoria: 'Sócios', tarefa: 'Analisar pró-labore' },
-        { categoria: 'Distribuição de Resultados', tarefa: 'Calcular lucro/prejuízo' },
-        { categoria: 'Distribuição de Resultados', tarefa: 'Preparar distribuição' },
-        { categoria: 'Aplicações', tarefa: 'Analisar aplicações financeiras' },
         { categoria: 'Fornecedores & Notas Fiscais', tarefa: 'Conciliar notas fiscais' },
         { categoria: 'Fornecedores & Notas Fiscais', tarefa: 'Verificar contas a pagar' },
         { categoria: 'Impostos & Fiscal', tarefa: 'Calcular IRPJ' },
@@ -97,6 +107,8 @@ export default function CompanyDetail({ company, onBack, user }) {
         { categoria: 'Folha de Pagamento', tarefa: 'Validar contribuições' },
         { categoria: 'Folha de Pagamento', tarefa: 'Processar rescisões' },
         { categoria: 'Folha de Pagamento', tarefa: 'Fechar folha mensal' },
+        { categoria: 'Distribuição de Resultados', tarefa: 'Calcular lucro/prejuízo' },
+        { categoria: 'Distribuição de Resultados', tarefa: 'Preparar distribuição' },
         { categoria: 'Outras Contas', tarefa: 'Analisar estoques' },
         { categoria: 'Outras Contas', tarefa: 'Verificar ativo imobilizado' },
         { categoria: 'Outras Contas', tarefa: 'Analisar intangíveis' },
@@ -619,63 +631,69 @@ export default function CompanyDetail({ company, onBack, user }) {
                         acc[cl.categoria].push(cl)
                         return acc
                       }, {})
-                    ).map(([categoria, tarefas]) => {
-                      const tarefasConcluidasCategoria = tarefas.filter(t => t.concluida).length
-                      const totalTarefasCategoria = tarefas.length
+                    )
+                      .sort(([catA], [catB]) => {
+                        const ordemA = ordemCategorias[catA] || 999
+                        const ordemB = ordemCategorias[catB] || 999
+                        return ordemA - ordemB
+                      })
+                      .map(([categoria, tarefas]) => {
+                        const tarefasConcluidasCategoria = tarefas.filter(t => t.concluida).length
+                        const totalTarefasCategoria = tarefas.length
 
-                      return (
-                        <div key={categoria} className="border rounded-lg overflow-hidden">
-                          <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 border-b">
-                            <div className="flex items-center justify-between">
-                              <h3 className="font-bold text-gray-800">{categoria}</h3>
-                              <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
-                                {tarefasConcluidasCategoria}/{totalTarefasCategoria}
-                              </span>
+                        return (
+                          <div key={categoria} className="border rounded-lg overflow-hidden">
+                            <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 border-b">
+                              <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-gray-800">{categoria}</h3>
+                                <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+                                  {tarefasConcluidasCategoria}/{totalTarefasCategoria}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="divide-y">
+                              {tarefas.map(cl => (
+                                <div
+                                  key={cl.id}
+                                  className={`flex items-center gap-3 p-3 transition ${
+                                    cl.concluida
+                                      ? 'bg-green-50'
+                                      : 'bg-white hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={cl.concluida}
+                                    onChange={() => toggleChecklist(cl.id, cl.concluida)}
+                                    className="w-5 h-5 cursor-pointer flex-shrink-0"
+                                  />
+                                  <div className="flex-1">
+                                    <p className={`${
+                                      cl.concluida 
+                                        ? 'line-through text-gray-500' 
+                                        : 'text-gray-800'
+                                    }`}>
+                                      {cl.tarefa}
+                                    </p>
+                                  </div>
+                                  {cl.concluida && (
+                                    <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex-shrink-0">
+                                      ✅
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => deletarTarefa(cl.id)}
+                                    className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex-shrink-0"
+                                  >
+                                    Remover
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           </div>
-
-                          <div className="divide-y">
-                            {tarefas.map(cl => (
-                              <div
-                                key={cl.id}
-                                className={`flex items-center gap-3 p-3 transition ${
-                                  cl.concluida
-                                    ? 'bg-green-50'
-                                    : 'bg-white hover:bg-gray-50'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={cl.concluida}
-                                  onChange={() => toggleChecklist(cl.id, cl.concluida)}
-                                  className="w-5 h-5 cursor-pointer flex-shrink-0"
-                                />
-                                <div className="flex-1">
-                                  <p className={`${
-                                    cl.concluida 
-                                      ? 'line-through text-gray-500' 
-                                      : 'text-gray-800'
-                                  }`}>
-                                    {cl.tarefa}
-                                  </p>
-                                </div>
-                                {cl.concluida && (
-                                  <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium flex-shrink-0">
-                                    ✅
-                                  </span>
-                                )}
-                                <button
-                                  onClick={() => deletarTarefa(cl.id)}
-                                  className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex-shrink-0"
-                                >
-                                  Remover
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })
+                        )
+                      })
                   )}
                 </div>
               </div>
