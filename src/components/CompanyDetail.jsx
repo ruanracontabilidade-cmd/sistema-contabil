@@ -318,12 +318,14 @@ export default function CompanyDetail({ company, onBack, user }) {
       <div className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex-1">
-            <button
-              onClick={onBack}
-              className="text-blue-600 hover:text-blue-800 mb-2 block"
-            >
-              ← Voltar
-            </button>
+            <div className="flex items-center justify-between w-full">
+  <button
+    onClick={onBack}
+    className="text-blue-600 hover:text-blue-800 block"
+  >
+    ← Voltar
+  </button>
+</div>
             <h1 className="text-2xl font-bold text-gray-800">{company.nome}</h1>
           </div>
           <div className="flex items-center gap-2">
