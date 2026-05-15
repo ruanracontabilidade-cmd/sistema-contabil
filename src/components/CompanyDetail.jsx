@@ -173,18 +173,35 @@ export default function CompanyDetail({ company, onBack, user }) {
     try {
       const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
 
-      const { error } = await supabase
-        .from('sessoes_trabalho')
-        .insert([{
-          empresa_id: company.id,
-          user_id: user.id,
-          mes: mesRef,
-          status: 'em_andamento',
-          iniciado_em: new Date().toISOString(),
-          atualizado_em: new Date().toISOString(),
-        }])
+      // Se já existe sessão (pausada ou concluída), fazer UPDATE
+      if (sessaoTrabalho) {
+        const { error } = await supabase
+          .from('sessoes_trabalho')
+          .update({
+            status: 'em_andamento',
+            iniciado_em: new Date().toISOString(),
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq('empresa_id', company.id)
+          .eq('user_id', user.id)
+          .eq('mes', mesRef)
 
-      if (error) throw error
+        if (error) throw error
+      } else {
+        // Senão, fazer INSERT
+        const { error } = await supabase
+          .from('sessoes_trabalho')
+          .insert([{
+            empresa_id: company.id,
+            user_id: user.id,
+            mes: mesRef,
+            status: 'em_andamento',
+            iniciado_em: new Date().toISOString(),
+            atualizado_em: new Date().toISOString(),
+          }])
+
+        if (error) throw error
+      }
 
       await supabase.from('atividades_log').insert([{
         empresa_id: company.id,
@@ -567,13 +584,16 @@ export default function CompanyDetail({ company, onBack, user }) {
             )}
 
             {/* Botão Iniciar Trabalho */}
-            {(!sessaoTrabalho || sessaoTrabalho.status === 'concluido' || sessaoTrabalho.status === 'pausado') && (
+            {selectedCompetencia && (
               <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <button
                   onClick={iniciarTrabalho}
                   className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition"
                 >
-                  {sessaoTrabalho?.status === 'pausado' ? '▶️ Retomar Trabalho' : '▶️ Iniciar Trabalho'}
+                  {sessaoTrabalho?.status === 'pausado' ? '▶️ Retomar Trabalho' : 
+                   sessaoTrabalho?.status === 'em_andamento' ? '▶️ Continuar Trabalho' :
+                   sessaoTrabalho?.status === 'concluido' ? '▶️ Recomeçar Trabalho' :
+                   '▶️ Iniciar Trabalho'}
                 </button>
               </div>
             )}
