@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import CompanyDetail from './CompanyDetail'
+import AtividadesFeed from './AtividadesFeed'
 
 export default function CoordenadorDashboard({ user }) {
   const [aba, setAba] = useState('dashboard')
@@ -24,31 +25,20 @@ export default function CoordenadorDashboard({ user }) {
     try {
       setLoading(true)
 
-      console.log('=== INICIANDO FETCH ===')
-
-      const { data: analistasData, error: analistasError } = await supabase
+      const { data: analistasData } = await supabase
         .from('users')
         .select('*')
         .eq('role', 'analista')
         .order('nome')
 
-      if (analistasError) throw analistasError
-      console.log('Analistas carregados:', analistasData)
-
-      const { data: companiesData, error: companiesError } = await supabase
+      const { data: companiesData } = await supabase
         .from('empresas')
         .select('*')
         .order('nome')
 
-      if (companiesError) throw companiesError
-      console.log('Empresas carregadas:', companiesData?.length)
-
-      const { data: userCompaniesData, error: ucError } = await supabase
+      const { data: userCompaniesData } = await supabase
         .from('user_companies')
         .select('*')
-
-      if (ucError) throw ucError
-      console.log('User Companies carregadas:', userCompaniesData?.length, userCompaniesData)
 
       const { data: extratosData } = await supabase
         .from('extratos')
@@ -63,10 +53,8 @@ export default function CoordenadorDashboard({ user }) {
       setUserCompanies(userCompaniesData || [])
       setExtratos(extratosData || [])
       setChecklists(checklistsData || [])
-
-      console.log('=== DADOS SETADOS ===')
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
+      console.error('Erro:', error)
       alert('Erro ao carregar dados: ' + error.message)
     } finally {
       setLoading(false)
@@ -150,13 +138,6 @@ export default function CoordenadorDashboard({ user }) {
     }
   }
 
-  const getAnalistaName = (empresaId) => {
-    const uc = userCompanies.find(uc => uc.empresa_id === empresaId)
-    if (!uc) return 'Sem analista'
-    const analista = analistas.find(a => a.id === uc.user_id)
-    return analista?.nome || 'Não encontrado'
-  }
-
   // Estatísticas globais
   const stats = {
     total_empresas: companies.length,
@@ -204,6 +185,13 @@ export default function CoordenadorDashboard({ user }) {
     return extratosEmpresa.length >= 3
   })
 
+  const getAnalistaName = (empresaId) => {
+    const uc = userCompanies.find(uc => uc.empresa_id === empresaId)
+    if (!uc) return 'Sem analista'
+    const analista = analistas.find(a => a.id === uc.user_id)
+    return analista?.nome || 'Não encontrado'
+  }
+
   if (selectedCompany) {
     return (
       <CompanyDetail
@@ -243,6 +231,7 @@ export default function CoordenadorDashboard({ user }) {
         <div className="max-w-7xl mx-auto px-4 flex gap-8 overflow-x-auto">
           {[
             { key: 'dashboard', label: '📊 Dashboard' },
+            { key: 'atividades', label: '📡 Atividades' },
             { key: 'analistas', label: '👥 Analistas' },
             { key: 'empresas', label: '🏢 Empresas' },
             { key: 'problemas', label: '⚠️ Problemas' },
@@ -316,6 +305,18 @@ export default function CoordenadorDashboard({ user }) {
                     ))
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ATIVIDADES AO VIVO */}
+        {aba === 'atividades' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold text-gray-800">📡 Atividades em Tempo Real</h2>
+            <p className="text-gray-600">Acompanhe em tempo real o que cada analista está fazendo</p>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <AtividadesFeed />
             </div>
           </div>
         )}
