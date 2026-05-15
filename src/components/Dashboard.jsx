@@ -10,17 +10,28 @@ export default function Dashboard({ user }) {
 
   useEffect(() => {
     fetchCompanies()
-  }, [user.id])
+  }, [user.email])
 
   const fetchCompanies = async () => {
     try {
       setLoading(true)
       
-      // Buscar empresas do usuário logado
+      // Buscar o user_id na tabela users pelo email
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', user.email)
+        .single()
+
+      if (userError) throw userError
+
+      const userId = userData.id
+
+      // Buscar empresas do usuário
       const { data, error } = await supabase
         .from('user_companies')
         .select('empresa_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
 
       if (error) throw error
 
