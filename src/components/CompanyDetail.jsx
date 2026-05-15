@@ -322,6 +322,15 @@ export default function CompanyDetail({ company, onBack, user }) {
   const tarefasConcluidas = checklists.filter(c => c.concluida).length
   const progresso = totalTarefas > 0 ? Math.round((tarefasConcluidas / totalTarefas) * 100) : 0
 
+  const mesesMap = {
+    '1': 'Jan', '2': 'Fev', '3': 'Mar', '4': 'Abr',
+    '5': 'Mai', '6': 'Jun', '7': 'Jul', '8': 'Ago',
+    '9': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez',
+    '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+    '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+    '09': 'Set'
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm border-b sticky top-0 z-10">
@@ -374,11 +383,7 @@ export default function CompanyDetail({ company, onBack, user }) {
             {mesesDoAno.map(mes => {
               const status = getMesStatus(mes.mes, mes.ano)
               const isSelected = selectedCompetencia?.id === mes.id
-              const mesesMap = {
-                '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
-                '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
-                '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
-              }
+              const mesNome = mesesMap[String(mes.mes)] || mesesMap[String(parseInt(mes.mes))] || `M${mes.mes}`
 
               let bgColor = 'bg-gray-50 border-gray-200'
               if (isSelected) bgColor = 'bg-blue-100 border-blue-300'
@@ -392,7 +397,7 @@ export default function CompanyDetail({ company, onBack, user }) {
                   onClick={() => setSelectedCompetencia(mes)}
                   className={`px-3 py-2 rounded-lg font-medium border-2 transition ${bgColor}`}
                 >
-                  <div className="text-sm">{mesesMap[mes.mes]}</div>
+                  <div className="text-sm font-bold">{mesNome}</div>
                   <div className="text-xs mt-1">
                     {status === 'concluido' && '✅'}
                     {status === 'em_andamento' && '▶️'}
