@@ -75,12 +75,11 @@ export default function CompanyDetail({ company, onBack, user }) {
 
   useEffect(() => {
     if (selectedCompetencia) {
-      criarChecklistPadrao()
       fetchChecklistAndSessao()
     }
   }, [selectedCompetencia])
 
-  const criarChecklistPadrao = async () => {
+  const fetchChecklistAndSessao = async () => {
     if (!selectedCompetencia) return
 
     try {
@@ -131,18 +130,12 @@ export default function CompanyDetail({ company, onBack, user }) {
           mes: mesRef,
         }))
 
-        await supabase.from('checklist_status').insert(tarefasAInserir)
+        const { error: insertError } = await supabase
+          .from('checklist_status')
+          .insert(tarefasAInserir)
+
+        if (insertError) console.error('Erro ao inserir checklists:', insertError)
       }
-    } catch (error) {
-      console.error('Erro ao criar checklist padrão:', error)
-    }
-  }
-
-  const fetchChecklistAndSessao = async () => {
-    if (!selectedCompetencia) return
-
-    try {
-      const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
 
       const { data: checklistData } = await supabase
         .from('checklist_status')
@@ -173,7 +166,6 @@ export default function CompanyDetail({ company, onBack, user }) {
     try {
       const mesRef = `${selectedCompetencia.mes}/${selectedCompetencia.ano}`
 
-      // Se já existe sessão (pausada ou concluída), fazer UPDATE
       if (sessaoTrabalho) {
         const { error } = await supabase
           .from('sessoes_trabalho')
@@ -188,7 +180,6 @@ export default function CompanyDetail({ company, onBack, user }) {
 
         if (error) throw error
       } else {
-        // Senão, fazer INSERT
         const { error } = await supabase
           .from('sessoes_trabalho')
           .insert([{
