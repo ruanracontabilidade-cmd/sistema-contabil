@@ -34,13 +34,11 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       setCompetencias(competenciasData || [])
 
-      // Pegar ano mais recente
       if (competenciasData?.length > 0) {
         const anoMaisRecente = competenciasData[0].ano
         setAnoSelecionado(anoMaisRecente)
       }
 
-      // Buscar todas as sessões dessa empresa
       const { data: sessoesData } = await supabase
         .from('sessoes_trabalho')
         .select('*')
@@ -49,7 +47,6 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       setSessoesTrabaho(sessoesData || [])
 
-      // Buscar extratos
       const { data: extratosData } = await supabase
         .from('extratos')
         .select('*')
@@ -140,6 +137,21 @@ export default function CompanyDetail({ company, onBack, user }) {
 
       if (novoStatusValue === 'pausado') {
         setShowPausarModal(true)
+        return
+      }
+
+      // Se for "nao_iniciado", deletar o registro
+      if (novoStatusValue === 'nao_iniciado') {
+        await supabase
+          .from('sessoes_trabalho')
+          .delete()
+          .eq('empresa_id', company.id)
+          .eq('user_id', user.id)
+          .eq('mes', mesRef)
+
+        setNovoStatus('nao_iniciado')
+        fetchAllData()
+        fetchChecklistAndSessao()
         return
       }
 
