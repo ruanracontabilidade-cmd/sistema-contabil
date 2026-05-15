@@ -21,59 +21,42 @@ export default function CoordenadorDashboard({ user }) {
   }, [])
 
   const fetchAllData = async () => {
-  try {
-    setLoading(true)
+    try {
+      setLoading(true)
 
-    // Buscar analistas
-    const { data: analistasData, error: analistasError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('role', 'analista')
-      .order('nome')
+      const { data: analistasData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'analista')
+        .order('nome')
 
-    if (analistasError) throw analistasError
+      const { data: companiesData } = await supabase
+        .from('empresas')
+        .select('*')
+        .order('nome')
 
-    // Buscar todas as empresas
-    const { data: companiesData, error: companiesError } = await supabase
-      .from('empresas')
-      .select('*')
-      .order('nome')
+      const { data: userCompaniesData } = await supabase
+        .from('user_companies')
+        .select('*')
 
-    if (companiesError) throw companiesError
+      const { data: extratosData } = await supabase
+        .from('extratos')
+        .select('*')
 
-    // Buscar associações
-    const { data: userCompaniesData, error: ucError } = await supabase
-      .from('user_companies')
-      .select('*')
+      const { data: checklistsData } = await supabase
+        .from('checklist_status')
+        .select('*')
 
-    if (ucError) throw ucError
-
-    console.log('Analistas:', analistasData)
-    console.log('User Companies:', userCompaniesData)
-    console.log('Total companies:', companiesData?.length)
-
-    // Buscar extratos
-    const { data: extratosData } = await supabase
-      .from('extratos')
-      .select('*')
-
-    // Buscar checklists
-    const { data: checklistsData } = await supabase
-      .from('checklist_status')
-      .select('*')
-
-    setAnalistas(analistasData || [])
-    setCompanies(companiesData || [])
-    setUserCompanies(userCompaniesData || [])
-    setExtratos(extratosData || [])
-    setChecklists(checklistsData || [])
-
-    console.log('Data loaded successfully')
-  } catch (error) {
-    console.error('Erro ao carregar dados:', error)
-    alert('Erro ao carregar dados: ' + error.message)
-  } finally {
-    setLoading(false)
+      setAnalistas(analistasData || [])
+      setCompanies(companiesData || [])
+      setUserCompanies(userCompaniesData || [])
+      setExtratos(extratosData || [])
+      setChecklists(checklistsData || [])
+    } catch (error) {
+      console.error('Erro:', error)
+      alert('Erro ao carregar dados: ' + error.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -221,7 +204,7 @@ export default function CoordenadorDashboard({ user }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Carregando...</p>
+        <p className="text-gray-600">Carregando dados...</p>
       </div>
     )
   }
@@ -403,38 +386,42 @@ export default function CoordenadorDashboard({ user }) {
 
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="space-y-2">
-                {empresasFiltradas.map(c => (
-                  <div key={c.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div 
-                      className="flex-1 cursor-pointer"
-                      onClick={() => setSelectedCompany(c)}
-                    >
-                      <h3 className="font-semibold text-gray-800">{c.nome}</h3>
-                      <p className="text-xs text-gray-500">Analista: {getAnalistaName(c.id)}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        c.status === 'em_dia' ? 'bg-green-100 text-green-700' :
-                        c.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {c.status === 'em_dia' ? '✓' : c.status === 'pendente' ? '⏳' : '⚠️'}
-                      </span>
-                      <button
-                        onClick={() => setShowReatribuirModal(c)}
-                        className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+                {empresasFiltradas.length === 0 ? (
+                  <p className="text-gray-600 text-center py-8">Nenhuma empresa encontrada</p>
+                ) : (
+                  empresasFiltradas.map(c => (
+                    <div key={c.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => setSelectedCompany(c)}
                       >
-                        Reatribuir
-                      </button>
-                      <button
-                        onClick={() => deletarEmpresa(c.id, c.nome)}
-                        className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
-                      >
-                        Deletar
-                      </button>
+                        <h3 className="font-semibold text-gray-800">{c.nome}</h3>
+                        <p className="text-xs text-gray-500">Analista: {getAnalistaName(c.id)}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          c.status === 'em_dia' ? 'bg-green-100 text-green-700' :
+                          c.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {c.status === 'em_dia' ? '✓' : c.status === 'pendente' ? '⏳' : '⚠️'}
+                        </span>
+                        <button
+                          onClick={() => setShowReatribuirModal(c)}
+                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+                        >
+                          Reatribuir
+                        </button>
+                        <button
+                          onClick={() => deletarEmpresa(c.id, c.nome)}
+                          className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                        >
+                          Deletar
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
