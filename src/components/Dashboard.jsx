@@ -10,18 +10,36 @@ export default function Dashboard({ user }) {
 
   useEffect(() => {
     fetchCompanies()
-  }, [])
+  }, [user.id])
 
   const fetchCompanies = async () => {
     try {
       setLoading(true)
+      
+      // Buscar empresas do usuário logado
       const { data, error } = await supabase
-        .from('empresas')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .from('user_companies')
+        .select('empresa_id')
+        .eq('user_id', user.id)
 
       if (error) throw error
-      setCompanies(data || [])
+
+      const empresaIds = data.map(uc => uc.empresa_id)
+
+      if (empresaIds.length === 0) {
+        setCompanies([])
+        return
+      }
+
+      // Buscar detalhes das empresas
+      const { data: empresasData, error: empresasError } = await supabase
+        .from('empresas')
+        .select('*')
+        .in('id', empresaIds)
+        .order('nome', { ascending: true })
+
+      if (empresasError) throw empresasError
+      setCompanies(empresasData || [])
     } catch (error) {
       console.error('Erro:', error)
       alert('Erro ao carregar empresas: ' + error.message)
@@ -39,6 +57,12 @@ export default function Dashboard({ user }) {
     return c.status === filter
   })
 
+  const stats = {
+    em_dia: companies.filter(c => c.status === 'em_dia').length,
+    pendente: companies.filter(c => c.status === 'pendente').length,
+    atrasado: companies.filter(c => c.status === 'atrasado').length,
+  }
+
   if (selectedCompany) {
     return (
       <CompanyDetail
@@ -49,19 +73,13 @@ export default function Dashboard({ user }) {
     )
   }
 
-  const stats = {
-    em_dia: companies.filter(c => c.status === 'em_dia').length,
-    pendente: companies.filter(c => c.status === 'pendente').length,
-    atrasado: companies.filter(c => c.status === 'atrasado').length,
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-            <p className="text-gray-600">Bem-vindo, {user.email}</p>
+            <p className="text-gray-600">{user.email}</p>
           </div>
           <button
             onClick={handleLogout}
@@ -90,7 +108,7 @@ export default function Dashboard({ user }) {
 
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800">Empresas ({filteredCompanies.length})</h2>
+            <h2 className="text-xl font-bold text-gray-800">Minhas Empresas ({filteredCompanies.length})</h2>
             <div className="flex gap-2 flex-wrap">
               {['todas', 'em_dia', 'pendente', 'atrasado'].map(f => (
                 <button
@@ -122,7 +140,6 @@ export default function Dashboard({ user }) {
                 >
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-800">{company.nome}</h3>
-                    <p className="text-sm text-gray-500">{company.cnpj}</p>
                   </div>
                   <div className={`px-3 py-1 rounded-full text-xs font-medium ${
                     company.status === 'em_dia'
