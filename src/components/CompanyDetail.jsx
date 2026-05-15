@@ -17,6 +17,7 @@ export default function CompanyDetail({ company, onBack, user }) {
   const [showPausarModal, setShowPausarModal] = useState(false)
   const [observacaoPausa, setObservacaoPausa] = useState('')
   const [novoStatus, setNovoStatus] = useState('')
+  const [abaSelecionada, setAbaSelecionada] = useState('checklist')
 
   useEffect(() => {
     fetchAllData()
@@ -565,106 +566,136 @@ export default function CompanyDetail({ company, onBack, user }) {
               </div>
             )}
 
-            {/* Checklist */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">
-                  Checklist ({tarefasConcluidas}/{totalTarefas})
-                </h2>
+            {/* Abas */}
+            <div className="bg-white rounded-lg shadow-sm border-b mb-6">
+              <div className="flex">
                 <button
-                  onClick={() => setShowChecklistModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                  onClick={() => setAbaSelecionada('checklist')}
+                  className={`flex-1 px-4 py-3 font-medium text-center border-b-2 transition ${
+                    abaSelecionada === 'checklist'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-gray-200 text-gray-600 hover:text-gray-800'
+                  }`}
                 >
-                  + Adicionar Tarefa Extra
+                  📋 Checklist ({tarefasConcluidas}/{totalTarefas})
                 </button>
-              </div>
-
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {checklists.length === 0 ? (
-                  <p className="text-gray-600 text-center py-4">Sem tarefas ainda</p>
-                ) : (
-                  checklists.map(cl => (
-                    <div
-                      key={cl.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg transition ${
-                        cl.concluida
-                          ? 'bg-green-50 border border-green-200'
-                          : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={cl.concluida}
-                        onChange={() => toggleChecklist(cl.id, cl.concluida)}
-                        className="w-5 h-5 cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className={`${
-                            cl.concluida 
-                              ? 'line-through text-gray-500' 
-                              : 'text-gray-800'
-                          }`}>
-                            {cl.tarefa}
-                          </p>
-                          {cl.concluida && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                              ✅ Concluído
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500">{cl.categoria}</p>
-                      </div>
-                      <button
-                        onClick={() => deletarTarefa(cl.id)}
-                        className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  ))
-                )}
+                <button
+                  onClick={() => setAbaSelecionada('extratos')}
+                  className={`flex-1 px-4 py-3 font-medium text-center border-b-2 transition ${
+                    abaSelecionada === 'extratos'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-gray-200 text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  📄 Extratos
+                </button>
               </div>
             </div>
 
-            {/* Extratos */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">Extratos</h2>
-                <button
-                  onClick={() => setShowModalExtrato(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
-                >
-                  + Solicitar
-                </button>
-              </div>
+            {/* ABA CHECKLIST */}
+            {abaSelecionada === 'checklist' && (
+              <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-gray-800">
+                    Checklist ({tarefasConcluidas}/{totalTarefas})
+                  </h2>
+                  <button
+                    onClick={() => setShowChecklistModal(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                  >
+                    + Adicionar Tarefa Extra
+                  </button>
+                </div>
 
-              <div className="space-y-2">
-                {extratos.filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`).length === 0 ? (
-                  <p className="text-gray-600 text-center py-4">Sem extratos</p>
-                ) : (
-                  extratos
-                    .filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`)
-                    .map(e => (
-                      <div key={e.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-gray-800">{e.destinatario}</p>
-                          <p className="text-xs text-gray-500">{e.mes_ref}</p>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {checklists.length === 0 ? (
+                    <p className="text-gray-600 text-center py-4">Sem tarefas ainda</p>
+                  ) : (
+                    checklists.map(cl => (
+                      <div
+                        key={cl.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition ${
+                          cl.concluida
+                            ? 'bg-green-50 border border-green-200'
+                            : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={cl.concluida}
+                          onChange={() => toggleChecklist(cl.id, cl.concluida)}
+                          className="w-5 h-5 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className={`${
+                              cl.concluida 
+                                ? 'line-through text-gray-500' 
+                                : 'text-gray-800'
+                            }`}>
+                              {cl.tarefa}
+                            </p>
+                            {cl.concluida && (
+                              <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                                ✅ Concluído
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">{cl.categoria}</p>
                         </div>
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${
-                          e.status === 'recebido' ? 'bg-green-100 text-green-700' :
-                          e.status === 'atrasado' ? 'bg-red-100 text-red-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {e.status === 'recebido' ? '✅ Recebido' :
-                           e.status === 'atrasado' ? '⚠️ Atrasado' :
-                           '⏳ Solicitado'}
-                        </span>
+                        <button
+                          onClick={() => deletarTarefa(cl.id)}
+                          className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                        >
+                          Remover
+                        </button>
                       </div>
                     ))
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* ABA EXTRATOS */}
+            {abaSelecionada === 'extratos' && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-gray-800">Extratos</h2>
+                  <button
+                    onClick={() => setShowModalExtrato(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                  >
+                    + Solicitar
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {extratos.filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`).length === 0 ? (
+                    <p className="text-gray-600 text-center py-4">Sem extratos</p>
+                  ) : (
+                    extratos
+                      .filter(e => e.mes_ref === `${selectedCompetencia.mes}/${selectedCompetencia.ano}`)
+                      .map(e => (
+                        <div key={e.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <p className="font-medium text-gray-800">{e.destinatario}</p>
+                            <p className="text-xs text-gray-500">{e.mes_ref}</p>
+                          </div>
+                          <span className={`px-3 py-1 rounded text-xs font-medium ${
+                            e.status === 'recebido' ? 'bg-green-100 text-green-700' :
+                            e.status === 'atrasado' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {e.status === 'recebido' ? '✅ Recebido' :
+                             e.status === 'atrasado' ? '⚠️ Atrasado' :
+                             '⏳ Solicitado'}
+                          </span>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
